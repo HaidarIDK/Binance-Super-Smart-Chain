@@ -1,0 +1,56 @@
+name: Build and Test BSSC Website
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+          
+      - name: Install dependencies
+        run: |
+          cd website
+          npm ci
+          
+      - name: Run type check
+        run: |
+          cd website
+          npm run type-check
+          
+      - name: Run linting
+        run: |
+          cd website
+          npm run lint
+          
+      - name: Build website
+        run: |
+          cd website
+          npm run build
+          
+      - name: Test build output
+        run: |
+          cd website
+          if [ ! -d "out" ]; then
+            echo "Build output directory 'out' not found"
+            exit 1
+          fi
+          if [ ! -f "out/index.html" ]; then
+            echo "Build output index.html not found"
+            exit 1
+          fi
+          echo "Build successful - output directory contains files"
+          ls -la out/
