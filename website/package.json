@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "replit:build": "npm run build",
+    "replit:start": "npm run start"
   },
   "dependencies": {
     "next": "^14.0.0",

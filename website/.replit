@@ -1,0 +1,46 @@
+modules = ["nodejs-18"]
+
+[nix]
+channel = "stable-22_11"
+
+[deployment]
+publicDir = "out"
+run = ["sh", "-c", "cd website && npm install && npm run build"]
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:$PATH"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", ".config"]
+
+[unitTest]
+language = "nodejs"
+
+[languages]
+
+[languages.javascript]
+pattern = "**/{*.js,*.jsx,*.ts,*.tsx}"
+
+[languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
+
+[debugger]
+support = true
+
+[debugger.interactive]
+transport = "localhost:0"
+startCommand = ["node", "--inspect", "website/node_modules/.bin/next", "dev"]
+
+[debugger.interactive.integratedAdapter]
+dapTcpPort = 0
+dapTcpAddress = "127.0.0.1"
+
+[debugger.interactive.initializeMessage]
+type = "request"
+command = "initialize"
+arguments = { clientID = "replit", clientName = "replit", adapterID = "node", locale = "en-us", linesStartAt1 = true, columnsStartAt1 = true, pathFormat = "path", supportsProgressReporting = true, supportsRunInTerminalRequest = true }
+
+[debugger.interactive.attach]
+hostName = "localhost"
+port = 9229
+timeout = 10000
