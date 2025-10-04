@@ -5,7 +5,7 @@ You can airdrop yourself BNB on your local network using the built-in faucet for
 Binance Super Smart Chain (BSSC) is built on Solana's proven speed, low fees, and powerful developer ecosystem.
 It introduces BNB as the native token, helping BNB become what it could have been and should be: faster, cheaper, and better.
 
-**In short: BSSC = Solana's performance with BNB as the gas token.**
+In short: BSSC = Solana's performance with BNB as the gas token.
 
 ## Project Overview
 
@@ -16,39 +16,60 @@ It introduces BNB as the native token, helping BNB become what it could have bee
 
 This project shows how a blockchain can be adapted to run on a different token while preserving all technical advantages.
 
-## Key Changes Made
+Key Changes Made
+#1. Native Token System
 
-### 1. Native Token System
-- Replaced all references to SOL with BNB
-- Updated conversion functions (`lamports_to_bnb`, `bnb_to_lamports`)
-- Changed the currency symbol from ◎ to BNB
-- Ensured backward compatibility so SOL-based code still runs without changes
+Replaced all references to SOL with BNB
 
-### 2. Version System
-- Added a new Client ID for BSSC so nodes are uniquely identifiable
-- Debug and logs now clearly show "Binance Super Smart Chain" instead of Solana
+Updated conversion functions (lamports_to_bnb, bnb_to_lamports)
 
-### 3. CLI Tools
+Changed the currency symbol from ◎ to BNB
+
+Ensured backward compatibility so SOL-based code still runs without changes
+
+#2. Version System
+
+Added a new Client ID for BSSC so nodes are uniquely identifiable
+
+Debug and logs now clearly show "Binance Super Smart Chain" instead of Solana
+
+#3. CLI Tools
+
 Command line tools renamed:
-- `solana` → `bssc`
-- `solana-keygen` → `bssc-keygen`
-- `solana-validator` → `bssc-validator`
+
+solana → bssc
+
+solana-keygen → bssc-keygen
+
+solana-validator → bssc-validator
 
 Help texts and cluster references updated for BSSC branding
 
-### 4. Genesis Configuration
-- Community pool initialized with 500,000 BNB
-- All token amounts updated to use BNB instead of SOL
-- Faucet ready for developers to test with BNB
+#4. Genesis Configuration
 
-## Final Result
+Community pool initialized with 500,000 BNB
+
+All token amounts updated to use BNB instead of SOL
+
+Faucet ready for developers to test with BNB
+
+
+#Final Result
 
 The project successfully forks Solana into Binance Super Smart Chain, a blockchain that is:
 
-- **Fast** (65,000 TPS)
-- **Cheap** (sub-cent fees)
-- **Familiar** (BNB as the native token)
-- **Compatible** (all Solana tools and code still work)
+Fast (65,000 TPS)
+
+Cheap (sub-cent fees)
+
+Familiar (BNB as the native token)
+
+Compatible (all Solana tools and code still work)
+
+BSSC builds on Solana’s strengths and adapts them to the Binance ecosystem with BNB as the gas token.
+
+As Raj envisioned in this post
+, now BNB is fast, cheap, and compatible.
 
 BSSC builds on Solana's strengths and adapts them to the Binance ecosystem with BNB as the gas token.
 
@@ -80,20 +101,7 @@ As Raj envisioned in this post, now BNB is fast, cheap, and compatible.
 - **Developer Tools**: Maintain BSSC-specific developer tooling
 - **Community**: Build a developer and user community
 
-### What You Get vs. What You Lose:
-**✅ What BSSC Provides:**
-- BNB as native gas token
-- Solana-level performance (65,000 TPS)
-- Complete control over the network
-- All existing Solana programs work unchanged
 
-**❌ What You Lose from Solana Mainnet:**
-- Existing network effects and liquidity
-- Established validator ecosystem
-- Proven RPC infrastructure
-- Active developer community
-- Exchange integrations and trading pairs
-- DeFi protocols and TVL
 
 **Bottom Line**: BSSC gives you "BNB as native gas" but requires building an entire L1 ecosystem from scratch. It's a massive undertaking that defeats the point of leveraging Solana's existing network effects.
 
