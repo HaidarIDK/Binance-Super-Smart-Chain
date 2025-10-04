@@ -66,7 +66,7 @@ export default function TechArchitecture() {
             Technical Architecture
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            BSSC is built on Solana's proven infrastructure with custom EVM and bridge components for seamless BNB integration.
+            BSSC is built on Solana&apos;s proven infrastructure with custom EVM and bridge components for seamless BNB integration.
           </p>
         </motion.div>
 
@@ -111,7 +111,7 @@ export default function TechArchitecture() {
               BSSC Architecture Layers
             </h3>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              A layered approach that combines Ethereum compatibility with Solana's performance.
+              A layered approach that combines Ethereum compatibility with Solana&apos;s performance.
             </p>
           </div>
 

@@ -33,7 +33,7 @@ export default function Hero() {
               <span className="gradient-text">Smart Chain</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Solana's proven performance meets BNB as the native gas token. 
+              Solana&apos;s proven performance meets BNB as the native gas token. 
               Experience 65,000 TPS with sub-cent fees and full EVM compatibility.
             </p>
           </motion.div>
