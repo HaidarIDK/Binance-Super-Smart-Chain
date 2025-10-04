@@ -25,6 +25,13 @@ use {
     std::collections::HashMap,
 };
 
+// Include gas optimization module
+mod gas_optimization;
+use gas_optimization::{
+    GasOptimizer, GasConfig, GasPriceRecommendation, 
+    GasOptimizationStats, BatchTransaction, EvmTransaction as GasEvmTransaction,
+};
+
 /// BSC EVM Program ID - This will be set during deployment
 solana_program::declare_id!("11111111111111111111111111111112");
 
@@ -154,6 +161,25 @@ pub enum EvmInstruction {
         amount: u128,
         proof: Vec<u8>,
     },
+    /// Execute batch transactions
+    ExecuteBatch {
+        transactions: Vec<EvmTransaction>,
+        batch_id: u64,
+    },
+    /// Get gas price recommendations
+    GetGasPriceRecommendations,
+    /// Get gas optimization statistics
+    GetGasOptimizationStats,
+    /// Estimate gas for transaction
+    EstimateGas {
+        to: Option<[u8; 20]>,
+        data: Vec<u8>,
+        value: u128,
+    },
+    /// Configure gas optimization
+    ConfigureGasOptimization {
+        config: GasConfig,
+    },
 }
 
 /// BSC Bridge Implementation
@@ -197,10 +223,11 @@ impl BscBridge {
     }
 }
 
-/// EVM Bytecode Executor
+/// EVM Bytecode Executor with Advanced Gas Optimization
 pub struct EvmExecutor {
     state: EvmState,
     bridge: BscBridge,
+    gas_optimizer: GasOptimizer,
 }
 
 impl EvmExecutor {
@@ -208,16 +235,28 @@ impl EvmExecutor {
         let bsc_bridge_address = [0u8; 20]; // Placeholder
         let validators = vec![[0u8; 20]]; // Placeholder
         let bridge = BscBridge::new(bsc_bridge_address, validators);
+        let gas_config = GasConfig::default();
+        let gas_optimizer = GasOptimizer::new(gas_config);
         
         Self {
             state: EvmState::new(),
             bridge,
+            gas_optimizer,
         }
     }
 
-    /// Execute EVM transaction
-    pub fn execute_transaction(&mut self, tx: EvmTransaction, sender: [u8; 20]) -> Result<Vec<u8>, ProgramError> {
-        // Calculate gas cost
+    /// Execute EVM transaction with gas optimization
+    pub fn execute_transaction(&mut self, mut tx: EvmTransaction, sender: [u8; 20]) -> Result<Vec<u8>, ProgramError> {
+        // Optimize gas price and limit using the gas optimizer
+        if tx.gas_price == 0 {
+            tx.gas_price = self.gas_optimizer.calculate_dynamic_gas_price(tx.gas_limit);
+        }
+        
+        if tx.gas_limit < 21000 {
+            tx.gas_limit = self.gas_optimizer.estimate_gas_limit(tx.to, &tx.data, tx.value);
+        }
+        
+        // Calculate optimized gas cost
         let gas_cost = tx.gas_limit as u128 * tx.gas_price;
         let total_cost = tx.value + gas_cost;
 
@@ -290,6 +329,60 @@ impl EvmExecutor {
     pub fn get_storage(&self, address: &[u8; 20], key: &[u8; 32]) -> [u8; 32] {
         self.state.get_storage(address, key)
     }
+
+    /// Execute batch transactions with gas optimization
+    pub fn execute_batch_transactions(
+        &mut self,
+        transactions: Vec<GasEvmTransaction>,
+        batch_id: u64,
+    ) -> Result<Vec<Vec<u8>>, ProgramError> {
+        // Create batch transaction
+        let batch = self.gas_optimizer.create_batch_transaction(transactions, batch_id)?;
+        
+        // Process batch with gas optimization
+        let results = self.gas_optimizer.process_batch_transaction(batch_id)?;
+        
+        // Execute each transaction in the batch
+        let mut execution_results = Vec::new();
+        for (i, tx) in batch.transactions.iter().enumerate() {
+            // Convert GasEvmTransaction to EvmTransaction for execution
+            let evm_tx = EvmTransaction {
+                nonce: tx.nonce,
+                gas_price: tx.gas_price,
+                gas_limit: tx.gas_limit,
+                to: tx.to,
+                value: tx.value,
+                data: tx.data.clone(),
+                v: 0,
+                r: [0u8; 32],
+                s: [0u8; 32],
+            };
+            let result = self.execute_transaction(evm_tx, tx.from)?;
+            execution_results.push(result);
+        }
+        
+        Ok(execution_results)
+    }
+
+    /// Get gas price recommendations
+    pub fn get_gas_price_recommendations(&mut self) -> GasPriceRecommendation {
+        self.gas_optimizer.get_gas_price_recommendation()
+    }
+
+    /// Get gas optimization statistics
+    pub fn get_gas_optimization_stats(&self) -> GasOptimizationStats {
+        self.gas_optimizer.get_optimization_stats()
+    }
+
+    /// Estimate gas for a transaction
+    pub fn estimate_gas(&mut self, to: Option<[u8; 20]>, data: &[u8], value: u128) -> u64 {
+        self.gas_optimizer.estimate_gas_limit(to, data, value)
+    }
+
+    /// Configure gas optimization settings
+    pub fn configure_gas_optimization(&mut self, config: GasConfig) {
+        self.gas_optimizer = GasOptimizer::new(config);
+    }
 }
 
 /// Process EVM instruction
@@ -355,6 +448,29 @@ pub fn process_evm_instruction(
             let to = [0u8; 20]; // Placeholder recipient
             executor.bridge.process_bridge(to, amount, proof)?;
         }
+        EvmInstruction::ExecuteBatch { transactions, batch_id } => {
+            // For now, create empty transactions - in production this would use the actual transactions
+            let gas_transactions: Vec<GasEvmTransaction> = vec![];
+            executor.execute_batch_transactions(gas_transactions, batch_id)?;
+        }
+        EvmInstruction::GetGasPriceRecommendations => {
+            let recommendations = executor.get_gas_price_recommendations();
+            // In a real implementation, this would return the recommendations
+            println!("Gas Price Recommendations: {:?}", recommendations);
+        }
+        EvmInstruction::GetGasOptimizationStats => {
+            let stats = executor.get_gas_optimization_stats();
+            // In a real implementation, this would return the stats
+            println!("Gas Optimization Stats: {:?}", stats);
+        }
+        EvmInstruction::EstimateGas { to, data, value } => {
+            let estimated_gas = executor.estimate_gas(to, &data, value);
+            // In a real implementation, this would return the estimated gas
+            println!("Estimated Gas: {}", estimated_gas);
+        }
+        EvmInstruction::ConfigureGasOptimization { config } => {
+            executor.configure_gas_optimization(config);
+        }
     }
 
     Ok(())
@@ -415,6 +531,44 @@ fn parse_instruction(data: &[u8]) -> Result<EvmInstruction, ProgramError> {
             let proof = data[17..].to_vec();
             Ok(EvmInstruction::BridgeFromBsc { amount, proof })
         }
+        5 => {
+            // ExecuteBatch
+            // For now, return a simplified version - in production this would deserialize the full batch
+            Ok(EvmInstruction::ExecuteBatch { 
+                transactions: vec![], 
+                batch_id: 0 
+            })
+        }
+        6 => {
+            // GetGasPriceRecommendations
+            Ok(EvmInstruction::GetGasPriceRecommendations)
+        }
+        7 => {
+            // GetGasOptimizationStats
+            Ok(EvmInstruction::GetGasOptimizationStats)
+        }
+        8 => {
+            // EstimateGas
+            if data.len() < 37 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let mut to = [0u8; 20];
+            to.copy_from_slice(&data[1..21]);
+            let value = u128::from_le_bytes(data[21..37].try_into().unwrap());
+            let data_bytes = data[37..].to_vec();
+            Ok(EvmInstruction::EstimateGas { 
+                to: Some(to), 
+                data: data_bytes, 
+                value 
+            })
+        }
+        9 => {
+            // ConfigureGasOptimization
+            // For now, return default config - in production this would deserialize the config
+            Ok(EvmInstruction::ConfigureGasOptimization { 
+                config: GasConfig::default() 
+            })
+        }
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -425,3 +579,4 @@ pub mod entrypoint {
 
     solana_program::entrypoint!(process_evm_instruction);
 }
+

@@ -17,6 +17,8 @@ no-entrypoint = []
 [dependencies]
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+borsh = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
 solana-program-test = { workspace = true }
