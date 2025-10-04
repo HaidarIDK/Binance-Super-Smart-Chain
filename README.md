@@ -1,5 +1,7 @@
 #Binance Super Smart Chain (BSSC)
 
+CA EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump
+
 You can airdrop yourself BNB on your local network using the built-in faucet for testing.
 
 Binance Super Smart Chain (BSSC) is built on Solana’s proven speed, low fees, and powerful developer ecosystem.
