@@ -2,14 +2,36 @@
 
 import { motion } from 'framer-motion'
 import { ArrowRight, Zap, Shield, Globe, Code, Rocket } from 'lucide-react'
+import { useState } from 'react'
 
 export default function Hero() {
+  const [copied, setCopied] = useState(false)
+  
   const features = [
     { icon: Zap, text: '65,000 TPS' },
     { icon: Shield, text: 'Sub-cent fees' },
     { icon: Globe, text: 'EVM Compatible' },
     { icon: Code, text: 'BNB Native' },
   ]
+
+  const copyPumpCA = async () => {
+    const contractAddress = 'EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump'
+    try {
+      await navigator.clipboard.writeText(contractAddress)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = contractAddress
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   return (
     <section className="relative min-h-screen flex items-center justify-center gradient-bg pt-16">
@@ -79,6 +101,25 @@ export default function Hero() {
               <Rocket size={20} />
               <span>View on GitHub</span>
             </a>
+          </motion.div>
+
+          {/* PUMP CA Button */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="mt-6"
+          >
+            <button
+              onClick={copyPumpCA}
+              className={`px-6 py-3 rounded-full font-semibold transition-all duration-300 transform hover:scale-105 ${
+                copied
+                  ? 'bg-green-500 text-white'
+                  : 'bg-red-500 text-white hover:bg-red-600'
+              }`}
+            >
+              {copied ? '✅ Copied!' : '🚀 PUMP CA'}
+            </button>
           </motion.div>
 
           {/* Performance Stats */}

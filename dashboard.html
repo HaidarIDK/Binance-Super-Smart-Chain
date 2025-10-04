@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BSC EVM Performance Dashboard</title>
+    <title>BSC EVM Performance Dashboard - Official PUMP Coin</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -382,6 +382,40 @@
                 </div>
             </div>
 
+            <!-- Official Contracts -->
+            <div class="card">
+                <h2>🚀 Official Contracts</h2>
+                <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem;">
+                    <h3 style="color: white; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        🪙 Official PUMP Coin
+                    </h3>
+                    <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <div style="font-family: 'Courier New', monospace; font-size: 0.9rem; word-break: break-all; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 4px;">
+                            EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <strong>Token:</strong> PUMP<br>
+                            <strong>Network:</strong> BSSC<br>
+                            <strong>Chain ID:</strong> 56
+                        </div>
+                        <div>
+                            <strong>Type:</strong> Official<br>
+                            <strong>Status:</strong> ✅ Verified<br>
+                            <strong>Contract:</strong> ERC-20
+                        </div>
+                    </div>
+                    <button onclick="copyContractAddress()" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.3s ease; width: 100%;">
+                        📋 Copy Contract Address
+                    </button>
+                </div>
+                <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #27ae60;">
+                    <strong style="color: #27ae60;">✅ Verified Contract</strong><br>
+                    <small style="color: #7f8c8d;">This is the official PUMP coin contract on BSSC network</small>
+                </div>
+            </div>
+
             <!-- Active Alerts -->
             <div class="card">
                 <h2>⚠️ Active Alerts</h2>
@@ -562,6 +596,83 @@
             updateTimestamp();
             startAutoRefresh();
         });
+
+        // Copy contract address function
+        function copyContractAddress() {
+            const contractAddress = 'EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump';
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(contractAddress).then(() => {
+                    showNotification('✅ PUMP Contract Address Copied to Clipboard!', 'success');
+                }).catch(err => {
+                    fallbackCopyTextToClipboard(contractAddress);
+                });
+            } else {
+                fallbackCopyTextToClipboard(contractAddress);
+            }
+        }
+        
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showNotification('✅ PUMP Contract Address Copied!', 'success');
+            } catch (err) {
+                showNotification('❌ Failed to copy. Please copy manually: ' + text, 'error');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                z-index: 1000;
+                font-weight: 500;
+                max-width: 400px;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            
+            // Add CSS animation
+            if (!document.querySelector('#notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
 
         // Add some interactivity
         document.querySelectorAll('.card').forEach(card => {
