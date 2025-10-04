@@ -5,9 +5,6 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
-  experimental: {
-    appDir: true
-  },
   assetPrefix: process.env.NODE_ENV === 'production' ? '/Binance-Super-Smart-Chain' : '',
   basePath: process.env.NODE_ENV === 'production' ? '/Binance-Super-Smart-Chain' : ''
 }

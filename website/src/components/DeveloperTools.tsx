@@ -188,7 +188,7 @@ chainId: 9701`
           <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-200">
             <Shield className="w-12 h-12 text-bsc-600 mx-auto mb-4" />
             <h4 className="text-lg font-semibold text-gray-900 mb-2">Proven Security</h4>
-            <p className="text-gray-600">Built on Solana's battle-tested infrastructure with additional security layers.</p>
+            <p className="text-gray-600">Built on Solana&apos;s battle-tested infrastructure with additional security layers.</p>
           </div>
           <div className="text-center p-6 bg-white rounded-xl shadow-sm border border-gray-200">
             <Globe className="w-12 h-12 text-bsc-600 mx-auto mb-4" />

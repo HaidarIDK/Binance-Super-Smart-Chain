@@ -57,7 +57,7 @@ export default function Footer() {
                 <span className="text-xl font-bold">BSSC</span>
               </div>
               <p className="text-gray-400 mb-6 max-w-md">
-                Binance Super Smart Chain combines Solana's performance with BNB as the native gas token, 
+                Binance Super Smart Chain combines Solana&apos;s performance with BNB as the native gas token, 
                 delivering 65,000 TPS with full EVM compatibility.
               </p>
               <div className="flex space-x-4">

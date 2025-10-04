@@ -71,7 +71,7 @@ export default function Features() {
             Why Choose BSSC?
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            BSSC combines the best of both worlds: Solana's performance and BSC's ecosystem compatibility.
+            BSSC combines the best of both worlds: Solana&apos;s performance and BSC&apos;s ecosystem compatibility.
           </p>
         </motion.div>
 
