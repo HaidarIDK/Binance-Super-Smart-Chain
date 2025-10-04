@@ -3,7 +3,7 @@
   "outputDirectory": "website/out",
   "installCommand": "cd website && npm install",
   "devCommand": "cd website && npm run dev",
-  "framework": "nextjs",
+  "framework": "replit",
   "github": {
     "silent": true
   }
