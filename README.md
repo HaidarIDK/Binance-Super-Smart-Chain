@@ -1,14 +1,14 @@
 # Binance Super Smart Chain (BSSC)
 
-Binance Super Smart Chain (BSSC) is a complete transformation of the Solana blockchain.
-It replaces Solana's native token SOL with BNB, while keeping all the speed, low fees, and developer tools that Solana is known for.
+Binance Super Smart Chain (BSSC) is built on Solana’s proven speed, low fees, and powerful developer ecosystem.
+It introduces BNB as the native token, helping BNB become what it could have been and should be: faster, cheaper, and better.
 
 **In short: BSSC = Solana's performance with BNB as the gas token.**
 
 ## Project Overview
 
-- **Base Technology**: Forked from Solana
-- **Transformation**: SOL → BNB (1 BNB = 5.1 SOL, same precision, same performance)
+- **Base Technology**: Forked from Solana (The better blockchain)
+- **Transformation**: SOL → BNB (1 BNB = 5.1 SOL, same precision, same performance) 1 to 1 real world 
 - **Status**: Complete, tested, and deployed
 - **Backward Compatibility**: 100 percent, existing Solana programs and code still work
 
