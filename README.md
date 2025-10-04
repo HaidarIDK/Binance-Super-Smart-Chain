@@ -1,6 +1,56 @@
 # Binance Super Smart Chain (BSSC)
 
-A high-performance blockchain platform forked from Solana, featuring BNB as the native token (1 BNB = 5.08 SOL).
+Binance Super Smart Chain (BSSC) is a complete transformation of the Solana blockchain.
+It replaces Solana's native token SOL with BNB, while keeping all the speed, low fees, and developer tools that Solana is known for.
+
+**In short: BSSC = Solana's performance with BNB as the gas token.**
+
+## Project Overview
+
+- **Base Technology**: Forked from Solana
+- **Transformation**: SOL → BNB (1 BNB = 5.1 SOL, same precision, same performance)
+- **Status**: Complete, tested, and deployed
+- **Backward Compatibility**: 100 percent, existing Solana programs and code still work
+
+This project shows how a blockchain can be adapted to run on a different token while preserving all technical advantages.
+
+## Key Changes Made
+
+### 1. Native Token System
+- Replaced all references to SOL with BNB
+- Updated conversion functions (`lamports_to_bnb`, `bnb_to_lamports`)
+- Changed the currency symbol from ◎ to BNB
+- Ensured backward compatibility so SOL-based code still runs without changes
+
+### 2. Version System
+- Added a new Client ID for BSSC so nodes are uniquely identifiable
+- Debug and logs now clearly show "Binance Super Smart Chain" instead of Solana
+
+### 3. CLI Tools
+Command line tools renamed:
+- `solana` → `bssc`
+- `solana-keygen` → `bssc-keygen`
+- `solana-validator` → `bssc-validator`
+
+Help texts and cluster references updated for BSSC branding
+
+### 4. Genesis Configuration
+- Community pool initialized with 500,000 BNB
+- All token amounts updated to use BNB instead of SOL
+- Faucet ready for developers to test with BNB
+
+## Final Result
+
+The project successfully forks Solana into Binance Super Smart Chain, a blockchain that is:
+
+- **Fast** (65,000 TPS)
+- **Cheap** (sub-cent fees)
+- **Familiar** (BNB as the native token)
+- **Compatible** (all Solana tools and code still work)
+
+BSSC demonstrates how existing blockchain technology can be adapted to a new ecosystem without losing performance or compatibility.
+
+**As Mert envisioned in this post, now BNB is fast, cheap, and compatible.**
 
 <p align="center">
   <a href="https://bssc.binance.org">
