@@ -39,6 +39,14 @@ use security::{
     VulnerabilityType, VulnerabilitySeverity, Property, PropertyType, AuditEventType,
 };
 
+// Include performance monitoring module
+mod performance_monitoring;
+use performance_monitoring::{
+    PerformanceMonitor, PerformanceConfig, PerformanceMetrics, TransactionAnalytics,
+    NetworkHealthReport, PerformanceDashboard, OptimizationRecommendation,
+    RecommendationType, RecommendationPriority, ImplementationEffort,
+};
+
 /// BSC EVM Program ID - This will be set during deployment
 solana_program::declare_id!("11111111111111111111111111111112");
 
@@ -214,6 +222,22 @@ pub enum EvmInstruction {
     UpdateSecurityConfig {
         config: SecurityConfig,
     },
+    /// Get performance metrics
+    GetPerformanceMetrics,
+    /// Get transaction analytics
+    GetTransactionAnalytics,
+    /// Get network health report
+    GetNetworkHealthReport,
+    /// Get performance dashboard
+    GetPerformanceDashboard,
+    /// Get optimization recommendations
+    GetOptimizationRecommendations,
+    /// Update performance monitoring configuration
+    UpdatePerformanceConfig {
+        config: PerformanceConfig,
+    },
+    /// Clear performance data
+    ClearPerformanceData,
 }
 
 /// BSC Bridge Implementation
@@ -257,12 +281,13 @@ impl BscBridge {
     }
 }
 
-/// EVM Bytecode Executor with Advanced Gas Optimization and Security
+/// EVM Bytecode Executor with Advanced Gas Optimization, Security, and Performance Monitoring
 pub struct EvmExecutor {
     state: EvmState,
     bridge: BscBridge,
     gas_optimizer: GasOptimizer,
     security_manager: SecurityManager,
+    performance_monitor: PerformanceMonitor,
 }
 
 impl EvmExecutor {
@@ -274,17 +299,22 @@ impl EvmExecutor {
         let gas_optimizer = GasOptimizer::new(gas_config);
         let security_config = SecurityConfig::default();
         let security_manager = SecurityManager::new(security_config);
+        let performance_config = PerformanceConfig::default();
+        let performance_monitor = PerformanceMonitor::new(performance_config);
         
         Self {
             state: EvmState::new(),
             bridge,
             gas_optimizer,
             security_manager,
+            performance_monitor,
         }
     }
 
-    /// Execute EVM transaction with gas optimization and security checks
+    /// Execute EVM transaction with gas optimization, security checks, and performance monitoring
     pub fn execute_transaction(&mut self, mut tx: EvmTransaction, sender: [u8; 20]) -> Result<Vec<u8>, ProgramError> {
+        let start_time = std::time::Instant::now();
+        
         // Security check: Validate transaction before execution
         self.security_manager.add_audit_trail_entry(
             AuditEventType::ContractCall,
@@ -326,7 +356,7 @@ impl EvmExecutor {
         }
 
         // Execute transaction
-        match tx.to {
+        let result = match tx.to {
             Some(to) => {
                 // Contract call or transfer
                 let code = self.state.get_code(&to);
@@ -342,11 +372,32 @@ impl EvmExecutor {
                 // Contract deployment
                 self.execute_contract_deployment(&tx.data, tx.gas_limit)
             }
+        };
+
+        // Record transaction for performance monitoring
+        let execution_time = start_time.elapsed().as_millis() as f64;
+        let tx_type = if tx.to.is_none() { "contract_deployment" } 
+                     else if tx.data.is_empty() { "simple_transfer" }
+                     else { "contract_interaction" }.to_string();
+        
+        self.performance_monitor.record_transaction(
+            tx_type,
+            result.is_ok(),
+            tx.gas_limit,
+            tx.gas_price,
+            execution_time,
+        );
+
+        // Update contract activity if this is a contract interaction
+        if let Some(contract_address) = tx.to {
+            self.performance_monitor.update_contract_activity(contract_address, tx.gas_limit as u128);
         }
+
+        result
     }
 
     /// Execute contract call
-    fn execute_contract_call(&mut self, address: &[u8; 20], data: &[u8], gas_limit: u64) -> Result<Vec<u8>, ProgramError> {
+    fn execute_contract_call(&mut self, address: &[u8; 20], _data: &[u8], gas_limit: u64) -> Result<Vec<u8>, ProgramError> {
         let code = self.state.get_code(address);
         if code.is_empty() {
             return Err(ProgramError::InvalidAccountData);
@@ -496,6 +547,41 @@ impl EvmExecutor {
 
         Ok(contract_address)
     }
+
+    /// Get current performance metrics
+    pub fn get_performance_metrics(&self) -> &PerformanceMetrics {
+        self.performance_monitor.get_current_metrics()
+    }
+
+    /// Get transaction analytics
+    pub fn get_transaction_analytics(&self) -> &TransactionAnalytics {
+        self.performance_monitor.get_transaction_analytics()
+    }
+
+    /// Get network health report
+    pub fn get_network_health_report(&self) -> NetworkHealthReport {
+        self.performance_monitor.get_network_health_report()
+    }
+
+    /// Get performance dashboard
+    pub fn get_performance_dashboard(&self) -> PerformanceDashboard {
+        self.performance_monitor.get_performance_dashboard()
+    }
+
+    /// Get optimization recommendations
+    pub fn get_optimization_recommendations(&self) -> &Vec<OptimizationRecommendation> {
+        self.performance_monitor.get_optimization_recommendations()
+    }
+
+    /// Update performance monitoring configuration
+    pub fn update_performance_config(&mut self, config: PerformanceConfig) {
+        self.performance_monitor.update_config(config);
+    }
+
+    /// Clear performance historical data
+    pub fn clear_performance_data(&mut self) {
+        self.performance_monitor.clear_historical_data();
+    }
 }
 
 /// Process EVM instruction
@@ -608,6 +694,34 @@ pub fn process_evm_instruction(
         EvmInstruction::UpdateSecurityConfig { config } => {
             executor.update_security_config(config);
             println!("Security configuration updated");
+        }
+        EvmInstruction::GetPerformanceMetrics => {
+            let metrics = executor.get_performance_metrics();
+            println!("Performance Metrics: {:?}", metrics);
+        }
+        EvmInstruction::GetTransactionAnalytics => {
+            let analytics = executor.get_transaction_analytics();
+            println!("Transaction Analytics: {:?}", analytics);
+        }
+        EvmInstruction::GetNetworkHealthReport => {
+            let health_report = executor.get_network_health_report();
+            println!("Network Health Report: {:?}", health_report);
+        }
+        EvmInstruction::GetPerformanceDashboard => {
+            let dashboard = executor.get_performance_dashboard();
+            println!("Performance Dashboard: {:?}", dashboard);
+        }
+        EvmInstruction::GetOptimizationRecommendations => {
+            let recommendations = executor.get_optimization_recommendations();
+            println!("Optimization Recommendations: {:?}", recommendations);
+        }
+        EvmInstruction::UpdatePerformanceConfig { config } => {
+            executor.update_performance_config(config);
+            println!("Performance configuration updated");
+        }
+        EvmInstruction::ClearPerformanceData => {
+            executor.clear_performance_data();
+            println!("Performance data cleared");
         }
     }
 
@@ -755,6 +869,37 @@ fn parse_instruction(data: &[u8]) -> Result<EvmInstruction, ProgramError> {
             Ok(EvmInstruction::UpdateSecurityConfig { 
                 config: SecurityConfig::default() 
             })
+        }
+        16 => {
+            // GetPerformanceMetrics
+            Ok(EvmInstruction::GetPerformanceMetrics)
+        }
+        17 => {
+            // GetTransactionAnalytics
+            Ok(EvmInstruction::GetTransactionAnalytics)
+        }
+        18 => {
+            // GetNetworkHealthReport
+            Ok(EvmInstruction::GetNetworkHealthReport)
+        }
+        19 => {
+            // GetPerformanceDashboard
+            Ok(EvmInstruction::GetPerformanceDashboard)
+        }
+        20 => {
+            // GetOptimizationRecommendations
+            Ok(EvmInstruction::GetOptimizationRecommendations)
+        }
+        21 => {
+            // UpdatePerformanceConfig
+            // For now, return default config - in production this would deserialize the config
+            Ok(EvmInstruction::UpdatePerformanceConfig { 
+                config: PerformanceConfig::default() 
+            })
+        }
+        22 => {
+            // ClearPerformanceData
+            Ok(EvmInstruction::ClearPerformanceData)
         }
         _ => Err(ProgramError::InvalidInstructionData),
     }
