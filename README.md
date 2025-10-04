@@ -1,6 +1,6 @@
 # Binance Super Smart Chain (BSSC)
 
-A high-performance blockchain platform forked from Solana, featuring BNB as the native token.
+A high-performance blockchain platform forked from Solana, featuring BNB as the native token (1 BNB = 5.08 SOL).
 
 <p align="center">
   <a href="https://bssc.binance.org">

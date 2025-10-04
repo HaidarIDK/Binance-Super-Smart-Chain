@@ -43,9 +43,13 @@ impl Token {
         }
     }
 
-    // Keep backward compatibility alias
+    // Keep backward compatibility - SOL amounts are treated as SOL lamports
     pub fn sol(amount: u64) -> Self {
-        Self::bnb(amount)
+        Self {
+            amount,
+            decimals: 9,
+            token_type: TokenType::Bnb, // Display as BNB but with SOL amount
+        }
     }
 
     pub fn spl_token(amount: u64, decimals: u8) -> Self {
