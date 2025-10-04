@@ -1,0 +1,23 @@
+[package]
+name = "bsc-bridge"
+version = "2.0.0"
+authors = ["Binance Super Smart Chain Maintainers <maintainers@binance.com>"]
+description = "BSC Bridge Implementation for Solana"
+license = "Apache-2.0"
+repository = "https://github.com/HaidarIDK/Binance-Super-Smart-Chain"
+homepage = "https://bssc.binance.org/"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+solana-program = { workspace = true }
+solana-sdk = { workspace = true }
+
+[dev-dependencies]
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }

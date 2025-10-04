@@ -1,27 +1,16 @@
 # Binance Super Smart Chain (BSSC)
 
+You can airdrop yourself BNB on your local network using the built-in faucet for testing.
+
 Binance Super Smart Chain (BSSC) is built on Solana's proven speed, low fees, and powerful developer ecosystem.
 It introduces BNB as the native token, helping BNB become what it could have been and should be: faster, cheaper, and better.
 
 **In short: BSSC = Solana's performance with BNB as the gas token.**
 
-## Important: What BSSC Actually Is
-
-**BSSC is a complete fork of Solana** - this means:
-- ✅ **BNB as native gas token** - BNB is truly native to the network
-- ✅ **Solana's performance** - Same 65,000 TPS, sub-cent fees, sub-second finality
-- ✅ **Total control** - Your own validators, RPCs, explorers, bridges, listings
-- ⚠️ **Separate network** - It's NOT Solana mainnet anymore
-- ⚠️ **Must bootstrap ecosystem** - You lose Solana mainnet's network effects and liquidity
-
-**Trade-offs:**
-- **Pros**: Complete control, BNB truly native, Solana-level performance
-- **Cons**: Must build your own ecosystem from scratch, lose Solana's existing decentralization/liquidity
-
 ## Project Overview
 
 - **Base Technology**: Forked from Solana (The better blockchain)
-- **Transformation**: SOL → BNB (1 BNB = 5.1 SOL, same precision, same performance) 1 to 1 real world 
+- **Transformation**: SOL → BNB (1 BNB = 5.1 SOL, same precision, same performance)
 - **Status**: Complete, tested, and deployed
 - **Backward Compatibility**: 100 percent, existing Solana programs and code still work
 
@@ -61,9 +50,22 @@ The project successfully forks Solana into Binance Super Smart Chain, a blockcha
 - **Familiar** (BNB as the native token)
 - **Compatible** (all Solana tools and code still work)
 
-BSSC demonstrates how existing blockchain technology can be adapted to a new ecosystem without losing performance or compatibility.
+BSSC builds on Solana's strengths and adapts them to the Binance ecosystem with BNB as the gas token.
 
-**As Mert envisioned in this post, now BNB is fast, cheap, and compatible.**
+As Raj envisioned in this post, now BNB is fast, cheap, and compatible.
+
+## Important: What BSSC Actually Is
+
+**BSSC is a complete fork of Solana** - this means:
+- **BNB as native gas token** - BNB is truly native to the network
+- **Solana's performance** - Same 65,000 TPS, sub-cent fees, sub-second finality
+- **Total control** - Your own validators, RPCs, explorers, bridges, listings
+- **Separate network** - It's NOT Solana mainnet anymore
+- **Must bootstrap ecosystem** - You lose Solana mainnet's network effects and liquidity
+
+**Trade-offs:**
+- **Pros**: Complete control, BNB truly native, Solana-level performance
+- **Cons**: Must build your own ecosystem from scratch, lose Solana's existing decentralization/liquidity
 
 ## Running BSSC as Production Network
 
@@ -94,12 +96,6 @@ BSSC demonstrates how existing blockchain technology can be adapted to a new eco
 - DeFi protocols and TVL
 
 **Bottom Line**: BSSC gives you "BNB as native gas" but requires building an entire L1 ecosystem from scratch. It's a massive undertaking that defeats the point of leveraging Solana's existing network effects.
-
-<p align="center">
-  <a href="https://bssc.binance.org">
-    <img alt="Binance Super Smart Chain" src="https://i.imgur.com/IKyzQ6T.png" width="250" />
-  </a>
-</p>
 
 [![BSSC crate](https://img.shields.io/crates/v/solana-core.svg)](https://crates.io/crates/solana-core)
 [![BSSC documentation](https://docs.rs/solana-core/badge.svg)](https://docs.rs/solana-core)
