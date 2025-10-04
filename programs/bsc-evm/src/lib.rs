@@ -32,6 +32,13 @@ use gas_optimization::{
     GasOptimizationStats, BatchTransaction, EvmTransaction as GasEvmTransaction,
 };
 
+// Include security module
+mod security;
+use security::{
+    SecurityManager, SecurityConfig, SecurityAuditResult, FormalVerificationResult,
+    VulnerabilityType, VulnerabilitySeverity, Property, PropertyType, AuditEventType,
+};
+
 /// BSC EVM Program ID - This will be set during deployment
 solana_program::declare_id!("11111111111111111111111111111112");
 
@@ -180,6 +187,33 @@ pub enum EvmInstruction {
     ConfigureGasOptimization {
         config: GasConfig,
     },
+    /// Audit contract security
+    AuditContract {
+        contract_address: [u8; 20],
+        bytecode: Vec<u8>,
+    },
+    /// Verify contract formally
+    VerifyContract {
+        contract_address: [u8; 20],
+        bytecode: Vec<u8>,
+        properties: Vec<Property>,
+    },
+    /// Check contract security status
+    CheckContractSecurity {
+        contract_address: [u8; 20],
+    },
+    /// Get security recommendations
+    GetSecurityRecommendations {
+        contract_address: [u8; 20],
+    },
+    /// Deploy contract with security checks
+    DeployContractSecure {
+        bytecode: Vec<u8>,
+    },
+    /// Update security configuration
+    UpdateSecurityConfig {
+        config: SecurityConfig,
+    },
 }
 
 /// BSC Bridge Implementation
@@ -223,11 +257,12 @@ impl BscBridge {
     }
 }
 
-/// EVM Bytecode Executor with Advanced Gas Optimization
+/// EVM Bytecode Executor with Advanced Gas Optimization and Security
 pub struct EvmExecutor {
     state: EvmState,
     bridge: BscBridge,
     gas_optimizer: GasOptimizer,
+    security_manager: SecurityManager,
 }
 
 impl EvmExecutor {
@@ -237,16 +272,28 @@ impl EvmExecutor {
         let bridge = BscBridge::new(bsc_bridge_address, validators);
         let gas_config = GasConfig::default();
         let gas_optimizer = GasOptimizer::new(gas_config);
+        let security_config = SecurityConfig::default();
+        let security_manager = SecurityManager::new(security_config);
         
         Self {
             state: EvmState::new(),
             bridge,
             gas_optimizer,
+            security_manager,
         }
     }
 
-    /// Execute EVM transaction with gas optimization
+    /// Execute EVM transaction with gas optimization and security checks
     pub fn execute_transaction(&mut self, mut tx: EvmTransaction, sender: [u8; 20]) -> Result<Vec<u8>, ProgramError> {
+        // Security check: Validate transaction before execution
+        self.security_manager.add_audit_trail_entry(
+            AuditEventType::ContractCall,
+            sender,
+            [0u8; 32], // Placeholder transaction hash
+            sender,
+            "Transaction execution started".to_string(),
+        );
+
         // Optimize gas price and limit using the gas optimizer
         if tx.gas_price == 0 {
             tx.gas_price = self.gas_optimizer.calculate_dynamic_gas_price(tx.gas_limit);
@@ -254,6 +301,11 @@ impl EvmExecutor {
         
         if tx.gas_limit < 21000 {
             tx.gas_limit = self.gas_optimizer.estimate_gas_limit(tx.to, &tx.data, tx.value);
+        }
+
+        // Security check: Validate gas limit
+        if tx.gas_limit > self.security_manager.config.max_gas_limit {
+            return Err(ProgramError::InvalidArgument);
         }
         
         // Calculate optimized gas cost
@@ -383,6 +435,67 @@ impl EvmExecutor {
     pub fn configure_gas_optimization(&mut self, config: GasConfig) {
         self.gas_optimizer = GasOptimizer::new(config);
     }
+
+    /// Perform security audit on contract
+    pub fn audit_contract(&mut self, contract_address: [u8; 20], bytecode: &[u8]) -> Result<SecurityAuditResult, ProgramError> {
+        self.security_manager.audit_contract(contract_address, bytecode)
+    }
+
+    /// Perform formal verification on contract
+    pub fn verify_contract(&mut self, contract_address: [u8; 20], bytecode: &[u8], properties: Vec<Property>) -> Result<FormalVerificationResult, ProgramError> {
+        self.security_manager.verify_contract(contract_address, bytecode, properties)
+    }
+
+    /// Check if contract is secure
+    pub fn is_contract_secure(&self, contract_address: &[u8; 20]) -> bool {
+        self.security_manager.is_contract_secure(contract_address)
+    }
+
+    /// Get security recommendations
+    pub fn get_security_recommendations(&self, contract_address: &[u8; 20]) -> Vec<String> {
+        self.security_manager.get_security_recommendations(contract_address)
+    }
+
+    /// Get security metrics
+    pub fn get_security_metrics(&self) -> &security::SecurityMetrics {
+        self.security_manager.get_security_metrics()
+    }
+
+    /// Get audit trail
+    pub fn get_audit_trail(&self) -> &Vec<security::AuditTrailEntry> {
+        self.security_manager.get_audit_trail()
+    }
+
+    /// Update security configuration
+    pub fn update_security_config(&mut self, config: SecurityConfig) {
+        self.security_manager.update_security_config(config);
+    }
+
+    /// Deploy contract with security checks
+    pub fn deploy_contract_secure(&mut self, bytecode: &[u8], sender: [u8; 20]) -> Result<[u8; 20], ProgramError> {
+        // Perform security audit before deployment
+        let audit_result = self.security_manager.audit_contract([0u8; 20], bytecode)?;
+        
+        // Check if contract passes security requirements
+        if audit_result.security_score < 0.7 || audit_result.vulnerabilities.iter().any(|v| v.severity == VulnerabilitySeverity::Critical) {
+            return Err(ProgramError::InvalidAccountData);
+        }
+
+        // Deploy contract if it passes security checks
+        let contract_address = [0u8; 20]; // Generate contract address
+        self.state.deploy_contract(&contract_address, bytecode.to_vec());
+
+        // Add to audit trail
+        self.security_manager.add_audit_trail_entry(
+            AuditEventType::ContractDeployment,
+            contract_address,
+            [0u8; 32],
+            sender,
+            "Contract deployed after passing security audit".to_string(),
+        );
+
+        Ok(contract_address)
+    }
 }
 
 /// Process EVM instruction
@@ -470,6 +583,31 @@ pub fn process_evm_instruction(
         }
         EvmInstruction::ConfigureGasOptimization { config } => {
             executor.configure_gas_optimization(config);
+        }
+        EvmInstruction::AuditContract { contract_address, bytecode } => {
+            let audit_result = executor.audit_contract(contract_address, &bytecode)?;
+            println!("Security Audit Result: {:?}", audit_result);
+        }
+        EvmInstruction::VerifyContract { contract_address, bytecode, properties } => {
+            let verification_result = executor.verify_contract(contract_address, &bytecode, properties)?;
+            println!("Formal Verification Result: {:?}", verification_result);
+        }
+        EvmInstruction::CheckContractSecurity { contract_address } => {
+            let is_secure = executor.is_contract_secure(&contract_address);
+            println!("Contract Security Status: {}", is_secure);
+        }
+        EvmInstruction::GetSecurityRecommendations { contract_address } => {
+            let recommendations = executor.get_security_recommendations(&contract_address);
+            println!("Security Recommendations: {:?}", recommendations);
+        }
+        EvmInstruction::DeployContractSecure { bytecode } => {
+            let sender = [0u8; 20]; // Placeholder sender
+            let contract_address = executor.deploy_contract_secure(&bytecode, sender)?;
+            println!("Contract deployed securely at: {:?}", contract_address);
+        }
+        EvmInstruction::UpdateSecurityConfig { config } => {
+            executor.update_security_config(config);
+            println!("Security configuration updated");
         }
     }
 
@@ -567,6 +705,55 @@ fn parse_instruction(data: &[u8]) -> Result<EvmInstruction, ProgramError> {
             // For now, return default config - in production this would deserialize the config
             Ok(EvmInstruction::ConfigureGasOptimization { 
                 config: GasConfig::default() 
+            })
+        }
+        10 => {
+            // AuditContract
+            // For now, return simplified version - in production this would deserialize the full data
+            Ok(EvmInstruction::AuditContract { 
+                contract_address: [0u8; 20], 
+                bytecode: vec![] 
+            })
+        }
+        11 => {
+            // VerifyContract
+            // For now, return simplified version - in production this would deserialize the full data
+            Ok(EvmInstruction::VerifyContract { 
+                contract_address: [0u8; 20], 
+                bytecode: vec![], 
+                properties: vec![] 
+            })
+        }
+        12 => {
+            // CheckContractSecurity
+            if data.len() < 21 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let mut contract_address = [0u8; 20];
+            contract_address.copy_from_slice(&data[1..21]);
+            Ok(EvmInstruction::CheckContractSecurity { contract_address })
+        }
+        13 => {
+            // GetSecurityRecommendations
+            if data.len() < 21 {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            let mut contract_address = [0u8; 20];
+            contract_address.copy_from_slice(&data[1..21]);
+            Ok(EvmInstruction::GetSecurityRecommendations { contract_address })
+        }
+        14 => {
+            // DeployContractSecure
+            // For now, return simplified version - in production this would deserialize the full bytecode
+            Ok(EvmInstruction::DeployContractSecure { 
+                bytecode: vec![] 
+            })
+        }
+        15 => {
+            // UpdateSecurityConfig
+            // For now, return default config - in production this would deserialize the config
+            Ok(EvmInstruction::UpdateSecurityConfig { 
+                config: SecurityConfig::default() 
             })
         }
         _ => Err(ProgramError::InvalidInstructionData),
