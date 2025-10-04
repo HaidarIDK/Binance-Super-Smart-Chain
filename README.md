@@ -1,9 +1,22 @@
 # Binance Super Smart Chain (BSSC)
 
-Binance Super Smart Chain (BSSC) is built on Solana’s proven speed, low fees, and powerful developer ecosystem.
+Binance Super Smart Chain (BSSC) is built on Solana's proven speed, low fees, and powerful developer ecosystem.
 It introduces BNB as the native token, helping BNB become what it could have been and should be: faster, cheaper, and better.
 
 **In short: BSSC = Solana's performance with BNB as the gas token.**
+
+## Important: What BSSC Actually Is
+
+**BSSC is a complete fork of Solana** - this means:
+- ✅ **BNB as native gas token** - BNB is truly native to the network
+- ✅ **Solana's performance** - Same 65,000 TPS, sub-cent fees, sub-second finality
+- ✅ **Total control** - Your own validators, RPCs, explorers, bridges, listings
+- ⚠️ **Separate network** - It's NOT Solana mainnet anymore
+- ⚠️ **Must bootstrap ecosystem** - You lose Solana mainnet's network effects and liquidity
+
+**Trade-offs:**
+- **Pros**: Complete control, BNB truly native, Solana-level performance
+- **Cons**: Must build your own ecosystem from scratch, lose Solana's existing decentralization/liquidity
 
 ## Project Overview
 
@@ -51,6 +64,36 @@ The project successfully forks Solana into Binance Super Smart Chain, a blockcha
 BSSC demonstrates how existing blockchain technology can be adapted to a new ecosystem without losing performance or compatibility.
 
 **As Mert envisioned in this post, now BNB is fast, cheap, and compatible.**
+
+## Running BSSC as Production Network
+
+**This fork is currently a proof-of-concept.** To run BSSC as a real production network, you need:
+
+### Infrastructure Requirements:
+- **Validators**: Recruit and run your own validator network
+- **RPC Endpoints**: Build and maintain your own RPC infrastructure  
+- **Explorers**: Create blockchain explorers for BSSC transactions
+- **Bridges**: Build bridges to other networks (Ethereum, BSC, etc.)
+- **Exchange Listings**: Get BNB-SSC listed on exchanges
+- **Developer Tools**: Maintain BSSC-specific developer tooling
+- **Community**: Build a developer and user community
+
+### What You Get vs. What You Lose:
+**✅ What BSSC Provides:**
+- BNB as native gas token
+- Solana-level performance (65,000 TPS)
+- Complete control over the network
+- All existing Solana programs work unchanged
+
+**❌ What You Lose from Solana Mainnet:**
+- Existing network effects and liquidity
+- Established validator ecosystem
+- Proven RPC infrastructure
+- Active developer community
+- Exchange integrations and trading pairs
+- DeFi protocols and TVL
+
+**Bottom Line**: BSSC gives you "BNB as native gas" but requires building an entire L1 ecosystem from scratch. It's a massive undertaking that defeats the point of leveraging Solana's existing network effects.
 
 <p align="center">
   <a href="https://bssc.binance.org">
