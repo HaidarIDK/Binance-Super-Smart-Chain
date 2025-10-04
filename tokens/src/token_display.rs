@@ -1,17 +1,17 @@
 use {
     solana_account_decoder::parse_token::real_number_string_trimmed,
-    solana_sdk::native_token::lamports_to_sol,
+    solana_sdk::native_token::lamports_to_bnb,
     std::{
         fmt::{Debug, Display, Formatter, Result},
         ops::Add,
     },
 };
 
-const SOL_SYMBOL: &str = "◎";
+const BNB_SYMBOL: &str = "BNB";
 
 #[derive(PartialEq, Eq)]
 pub enum TokenType {
-    Sol,
+    Bnb,
     SplToken,
 }
 
@@ -24,9 +24,9 @@ pub struct Token {
 impl Token {
     fn write_with_symbol(&self, f: &mut Formatter) -> Result {
         match &self.token_type {
-            TokenType::Sol => {
-                let amount = lamports_to_sol(self.amount);
-                write!(f, "{SOL_SYMBOL}{amount}")
+            TokenType::Bnb => {
+                let amount = lamports_to_bnb(self.amount);
+                write!(f, "{BNB_SYMBOL}{amount}")
             }
             TokenType::SplToken => {
                 let amount = real_number_string_trimmed(self.amount, self.decimals);
@@ -35,12 +35,17 @@ impl Token {
         }
     }
 
-    pub fn sol(amount: u64) -> Self {
+    pub fn bnb(amount: u64) -> Self {
         Self {
             amount,
             decimals: 9,
-            token_type: TokenType::Sol,
+            token_type: TokenType::Bnb,
         }
+    }
+
+    // Keep backward compatibility alias
+    pub fn sol(amount: u64) -> Self {
+        Self::bnb(amount)
     }
 
     pub fn spl_token(amount: u64, decimals: u8) -> Self {

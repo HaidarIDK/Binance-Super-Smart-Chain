@@ -128,9 +128,9 @@ resolver = "2"
 
 [workspace.package]
 version = "2.0.0"
-authors = ["Solana Labs Maintainers <maintainers@solanalabs.com>"]
-repository = "https://github.com/solana-labs/solana"
-homepage = "https://solanalabs.com/"
+authors = ["Binance Super Smart Chain Maintainers <maintainers@binance.com>"]
+repository = "https://github.com/binance-super-smart-chain/bssc"
+homepage = "https://bssc.binance.org/"
 license = "Apache-2.0"
 edition = "2021"
 
@@ -434,8 +434,6 @@ zeroize = { version = "1.3", default-features = false }
 zstd = "0.11.2"
 
 [patch.crates-io]
-# for details, see https://github.com/solana-labs/crossbeam/commit/fd279d707025f0e60951e429bf778b4813d1b6bf
-crossbeam-epoch = { git = "https://github.com/solana-labs/crossbeam", rev = "fd279d707025f0e60951e429bf778b4813d1b6bf" }
 
 # We include the following crates as our dependencies above from crates.io:
 #

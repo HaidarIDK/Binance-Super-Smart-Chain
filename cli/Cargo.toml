@@ -62,7 +62,7 @@ tempfile = { workspace = true }
 test-case = { workspace = true }
 
 [[bin]]
-name = "solana"
+name = "bssc"
 path = "src/main.rs"
 
 [package.metadata.docs.rs]

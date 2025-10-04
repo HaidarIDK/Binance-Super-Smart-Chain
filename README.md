@@ -1,22 +1,17 @@
-# PLEASE READ: This repo is now a public archive
+# Binance Super Smart Chain (BSSC)
 
-This repo still exists in archived form, feel free to fork any reference
-implementations it still contains.
-
-See Agave, the Solana validator implementation from Anza: https://github.com/anza-xyz/agave
-
----
+A high-performance blockchain platform forked from Solana, featuring BNB as the native token.
 
 <p align="center">
-  <a href="https://solana.com">
-    <img alt="Solana" src="https://i.imgur.com/IKyzQ6T.png" width="250" />
+  <a href="https://bssc.binance.org">
+    <img alt="Binance Super Smart Chain" src="https://i.imgur.com/IKyzQ6T.png" width="250" />
   </a>
 </p>
 
-[![Solana crate](https://img.shields.io/crates/v/solana-core.svg)](https://crates.io/crates/solana-core)
-[![Solana documentation](https://docs.rs/solana-core/badge.svg)](https://docs.rs/solana-core)
-[![Build status](https://badge.buildkite.com/8cc350de251d61483db98bdfc895b9ea0ac8ffa4a32ee850ed.svg?branch=master)](https://buildkite.com/solana-labs/solana/builds?branch=master)
-[![codecov](https://codecov.io/gh/solana-labs/solana/branch/master/graph/badge.svg)](https://codecov.io/gh/solana-labs/solana)
+[![BSSC crate](https://img.shields.io/crates/v/solana-core.svg)](https://crates.io/crates/solana-core)
+[![BSSC documentation](https://docs.rs/solana-core/badge.svg)](https://docs.rs/solana-core)
+[![Build status](https://badge.buildkite.com/8cc350de251d61483db98bdfc895b9ea0ac8ffa4a32ee850ed.svg?branch=master)](https://buildkite.com/binance-super-smart-chain/bssc/builds?branch=master)
+[![codecov](https://codecov.io/gh/binance-super-smart-chain/bssc/branch/master/graph/badge.svg)](https://codecov.io/gh/binance-super-smart-chain/bssc)
 
 # Building
 

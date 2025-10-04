@@ -594,7 +594,7 @@ pub fn parse_command(
                 crate_description!(),
                 solana_version::version!(),
             )
-            .gen_completions_to("solana", shell_choice, &mut stdout());
+            .gen_completions_to("bssc", shell_choice, &mut stdout());
             std::process::exit(0);
         }
         // Cluster Query Commands

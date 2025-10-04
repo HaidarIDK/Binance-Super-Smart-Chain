@@ -6,39 +6,39 @@ source "$here"/common.sh
 
 set -e
 
-rm -rf "$SOLANA_CONFIG_DIR"/bootstrap-validator
-mkdir -p "$SOLANA_CONFIG_DIR"/bootstrap-validator
+rm -rf "$BSSC_CONFIG_DIR"/bootstrap-validator
+mkdir -p "$BSSC_CONFIG_DIR"/bootstrap-validator
 
 # Create genesis ledger
 if [[ -r $FAUCET_KEYPAIR ]]; then
-  cp -f "$FAUCET_KEYPAIR" "$SOLANA_CONFIG_DIR"/faucet.json
+  cp -f "$FAUCET_KEYPAIR" "$BSSC_CONFIG_DIR"/faucet.json
 else
-  $solana_keygen new --no-passphrase -fso "$SOLANA_CONFIG_DIR"/faucet.json
+  $bssc_keygen new --no-passphrase -fso "$BSSC_CONFIG_DIR"/faucet.json
 fi
 
 if [[ -f $BOOTSTRAP_VALIDATOR_IDENTITY_KEYPAIR ]]; then
-  cp -f "$BOOTSTRAP_VALIDATOR_IDENTITY_KEYPAIR" "$SOLANA_CONFIG_DIR"/bootstrap-validator/identity.json
+  cp -f "$BOOTSTRAP_VALIDATOR_IDENTITY_KEYPAIR" "$BSSC_CONFIG_DIR"/bootstrap-validator/identity.json
 else
-  $solana_keygen new --no-passphrase -so "$SOLANA_CONFIG_DIR"/bootstrap-validator/identity.json
+  $bssc_keygen new --no-passphrase -so "$BSSC_CONFIG_DIR"/bootstrap-validator/identity.json
 fi
 if [[ -f $BOOTSTRAP_VALIDATOR_STAKE_KEYPAIR ]]; then
-  cp -f "$BOOTSTRAP_VALIDATOR_STAKE_KEYPAIR" "$SOLANA_CONFIG_DIR"/bootstrap-validator/stake-account.json
+  cp -f "$BOOTSTRAP_VALIDATOR_STAKE_KEYPAIR" "$BSSC_CONFIG_DIR"/bootstrap-validator/stake-account.json
 else
-  $solana_keygen new --no-passphrase -so "$SOLANA_CONFIG_DIR"/bootstrap-validator/stake-account.json
+  $bssc_keygen new --no-passphrase -so "$BSSC_CONFIG_DIR"/bootstrap-validator/stake-account.json
 fi
 if [[ -f $BOOTSTRAP_VALIDATOR_VOTE_KEYPAIR ]]; then
-  cp -f "$BOOTSTRAP_VALIDATOR_VOTE_KEYPAIR" "$SOLANA_CONFIG_DIR"/bootstrap-validator/vote-account.json
+  cp -f "$BOOTSTRAP_VALIDATOR_VOTE_KEYPAIR" "$BSSC_CONFIG_DIR"/bootstrap-validator/vote-account.json
 else
-  $solana_keygen new --no-passphrase -so "$SOLANA_CONFIG_DIR"/bootstrap-validator/vote-account.json
+  $bssc_keygen new --no-passphrase -so "$BSSC_CONFIG_DIR"/bootstrap-validator/vote-account.json
 fi
 
 args=(
   "$@"
   --max-genesis-archive-unpacked-size 1073741824
   --enable-warmup-epochs
-  --bootstrap-validator "$SOLANA_CONFIG_DIR"/bootstrap-validator/identity.json
-                        "$SOLANA_CONFIG_DIR"/bootstrap-validator/vote-account.json
-                        "$SOLANA_CONFIG_DIR"/bootstrap-validator/stake-account.json
+  --bootstrap-validator "$BSSC_CONFIG_DIR"/bootstrap-validator/identity.json
+                        "$BSSC_CONFIG_DIR"/bootstrap-validator/vote-account.json
+                        "$BSSC_CONFIG_DIR"/bootstrap-validator/stake-account.json
 )
 
 "$SOLANA_ROOT"/fetch-spl.sh
@@ -49,10 +49,10 @@ if [[ -r spl-genesis-args.sh ]]; then
   args+=($SPL_GENESIS_ARGS)
 fi
 
-default_arg --ledger "$SOLANA_CONFIG_DIR"/bootstrap-validator
-default_arg --faucet-pubkey "$SOLANA_CONFIG_DIR"/faucet.json
+default_arg --ledger "$BSSC_CONFIG_DIR"/bootstrap-validator
+default_arg --faucet-pubkey "$BSSC_CONFIG_DIR"/faucet.json
 default_arg --faucet-lamports 500000000000000000
 default_arg --hashes-per-tick auto
 default_arg --cluster-type development
 
-$solana_genesis "${args[@]}"
+$bssc_genesis "${args[@]}"
