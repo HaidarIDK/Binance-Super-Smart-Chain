@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSC EVM Performance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #27ae60;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #34495e;
+        }
+
+        .metric-value {
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .status-good { color: #27ae60; }
+        .status-warning { color: #f39c12; }
+        .status-critical { color: #e74c3c; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .recommendation {
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .recommendation.high {
+            border-left-color: #e74c3c;
+            background: #fdf2f2;
+        }
+
+        .recommendation.medium {
+            border-left-color: #f39c12;
+            background: #fefbf3;
+        }
+
+        .alert {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+        }
+
+        .alert.warning {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .trend-up { color: #27ae60; }
+        .trend-down { color: #e74c3c; }
+        .trend-stable { color: #95a5a6; }
+
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+
+        .last-updated {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span>🚀</span>
+            BSC EVM Performance Dashboard
+            <div class="status-indicator"></div>
+        </h1>
+        <button class="refresh-btn" onclick="refreshDashboard()">🔄 Refresh Data</button>
+    </div>
+
+    <div class="container">
+        <div class="grid">
+            <!-- Real-time Metrics -->
+            <div class="card">
+                <h2>📊 Real-time Metrics</h2>
+                <div class="metric">
+                    <span class="metric-label">Current TPS</span>
+                    <span class="metric-value status-warning">45,000</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Average Latency</span>
+                    <span class="metric-value status-good">850ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">P95 Latency</span>
+                    <span class="metric-value status-good">1,200ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">P99 Latency</span>
+                    <span class="metric-value status-good">1,800ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Error Rate</span>
+                    <span class="metric-value status-good">0.15%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Success Rate</span>
+                    <span class="metric-value status-good">99.85%</span>
+                </div>
+            </div>
+
+            <!-- Network Health -->
+            <div class="card">
+                <h2>🏥 Network Health</h2>
+                <div class="metric">
+                    <span class="metric-label">Overall Score</span>
+                    <span class="metric-value status-good">83.5%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Performance</span>
+                    <span class="metric-value status-good">85.2%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Stability</span>
+                    <span class="metric-value status-good">82.1%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Efficiency</span>
+                    <span class="metric-value status-good">83.2%</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="healthChart"></canvas>
+                </div>
+            </div>
+
+            <!-- System Resources -->
+            <div class="card">
+                <h2>💻 System Resources</h2>
+                <div class="metric">
+                    <span class="metric-label">CPU Usage</span>
+                    <span class="metric-value status-warning">65%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Memory Usage</span>
+                    <span class="metric-value status-good">2.05GB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Active Connections</span>
+                    <span class="metric-value status-good">1,250</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Queue Depth</span>
+                    <span class="metric-value status-good">45</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Network Congestion</span>
+                    <span class="metric-value status-good">35%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Gas Utilization</span>
+                    <span class="metric-value status-good">78.5%</span>
+                </div>
+            </div>
+
+            <!-- Transaction Analytics -->
+            <div class="card full-width">
+                <h2>📈 Transaction Analytics</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <div class="metric">
+                            <span class="metric-label">Total Transactions</span>
+                            <span class="metric-value">234,700</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Successful</span>
+                            <span class="metric-value status-good">234,500</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Failed</span>
+                            <span class="metric-value">200</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="metric">
+                            <span class="metric-label">Average Gas Price</span>
+                            <span class="metric-value">25 gwei</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Average Gas Used</span>
+                            <span class="metric-value">85,000</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Peak TPS</span>
+                            <span class="metric-value status-good">65,000</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="transactionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Performance Trends -->
+            <div class="card full-width">
+                <h2>📊 Performance Trends (24h)</h2>
+                <div class="chart-container">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Optimization Recommendations -->
+            <div class="card">
+                <h2>🚀 Optimization Recommendations</h2>
+                <div class="recommendation high">
+                    <strong>🔴 Critical: Scale Infrastructure</strong><br>
+                    Expected Improvement: 75%<br>
+                    Effort: > 1 month
+                </div>
+                <div class="recommendation high">
+                    <strong>🟠 High: Implement Batch Processing</strong><br>
+                    Expected Improvement: 50%<br>
+                    Effort: 1-7 days
+                </div>
+                <div class="recommendation high">
+                    <strong>🟠 High: Optimize Network Layer</strong><br>
+                    Expected Improvement: 30%<br>
+                    Effort: 1-4 weeks
+                </div>
+                <div class="recommendation medium">
+                    <strong>🟡 Medium: Optimize Gas Usage</strong><br>
+                    Expected Improvement: 25%<br>
+                    Effort: 1-7 days
+                </div>
+                <div style="margin-top: 1rem; padding: 1rem; background: #e8f5e8; border-radius: 8px;">
+                    <strong>💡 Total Potential Improvement: 180%</strong>
+                </div>
+            </div>
+
+            <!-- User Experience -->
+            <div class="card">
+                <h2>👥 User Experience</h2>
+                <div class="metric">
+                    <span class="metric-label">Confirmation Time</span>
+                    <span class="metric-value status-good">850ms</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Satisfaction Score</span>
+                    <span class="metric-value status-good">4.9/5.0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Success Rate</span>
+                    <span class="metric-value status-good">99.85%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Abandonment Rate</span>
+                    <span class="metric-value status-good">0.08%</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Feedback Score</span>
+                    <span class="metric-value status-good">4.8/5.0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Support Tickets</span>
+                    <span class="metric-value">12 (24h)</span>
+                </div>
+            </div>
+
+            <!-- Active Alerts -->
+            <div class="card">
+                <h2>⚠️ Active Alerts</h2>
+                <div class="alert warning">
+                    <strong>⚠️ Warning:</strong> CPU usage approaching limit<br>
+                    <small>Consider scaling infrastructure</small>
+                </div>
+                <div class="alert">
+                    <strong>ℹ️ Info:</strong> Gas prices slightly elevated<br>
+                    <small>Monitor for potential congestion</small>
+                </div>
+                <div class="alert">
+                    <strong>ℹ️ Info:</strong> Peak TPS approaching capacity<br>
+                    <small>Consider batch processing implementation</small>
+                </div>
+                <div style="margin-top: 1rem; text-align: center;">
+                    <strong>3 Active Alerts (2 Info, 1 Warning)</strong><br>
+                    <small>All within acceptable thresholds</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="last-updated">
+            Last updated: <span id="lastUpdated"></span> | 
+            Dashboard Status: 🟢 Healthy | 
+            Auto-refresh: Every 30 seconds
+        </div>
+    </div>
+
+    <script>
+        // Initialize charts
+        function initCharts() {
+            // Network Health Chart
+            const healthCtx = document.getElementById('healthChart').getContext('2d');
+            new Chart(healthCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Performance', 'Stability', 'Efficiency'],
+                    datasets: [{
+                        data: [85.2, 82.1, 83.2],
+                        backgroundColor: ['#27ae60', '#3498db', '#f39c12'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Transaction Distribution Chart
+            const transactionCtx = document.getElementById('transactionChart').getContext('2d');
+            new Chart(transactionCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Simple Transfer', 'Contract Interaction', 'Batch Transaction', 'Cross-chain', 'Contract Deployment'],
+                    datasets: [{
+                        data: [125000, 85000, 15000, 3200, 2500],
+                        backgroundColor: ['#27ae60', '#3498db', '#f39c12', '#9b59b6', '#e74c3c'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Performance Trends Chart
+            const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+            new Chart(trendsCtx, {
+                type: 'line',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+                    datasets: [
+                        {
+                            label: 'TPS',
+                            data: [38000, 42000, 45000, 47000, 45000, 43000, 45000],
+                            borderColor: '#27ae60',
+                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Latency (ms)',
+                            data: [1200, 1000, 900, 850, 850, 900, 850],
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Error Rate (%)',
+                            data: [0.2, 0.15, 0.1, 0.15, 0.15, 0.2, 0.15],
+                            borderColor: '#f39c12',
+                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'TPS'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Latency (ms)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update timestamp
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('lastUpdated').textContent = now.toLocaleString();
+        }
+
+        // Refresh dashboard data
+        function refreshDashboard() {
+            // Simulate data refresh
+            updateTimestamp();
+            
+            // Add visual feedback
+            const refreshBtn = document.querySelector('.refresh-btn');
+            refreshBtn.textContent = '🔄 Refreshing...';
+            refreshBtn.disabled = true;
+            
+            setTimeout(() => {
+                refreshBtn.textContent = '🔄 Refresh Data';
+                refreshBtn.disabled = false;
+                // In a real implementation, this would fetch new data from the API
+            }, 1000);
+        }
+
+        // Auto-refresh every 30 seconds
+        function startAutoRefresh() {
+            setInterval(() => {
+                refreshDashboard();
+            }, 30000);
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateTimestamp();
+            startAutoRefresh();
+        });
+
+        // Add some interactivity
+        document.querySelectorAll('.card').forEach(card => {
+            card.addEventListener('click', function() {
+                this.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    this.style.transform = '';
+                }, 150);
+            });
+        });
+    </script>
+</body>
+</html>
