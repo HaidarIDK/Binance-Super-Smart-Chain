@@ -3,8 +3,8 @@ const https = require('https');
 const http = require('http');
 const fs = require('fs');
 
-const HTTP_PORT = 80;
-const HTTPS_PORT = 443;
+const HTTP_PORT = process.env.PORT || 80;
+const HTTPS_PORT = process.env.PORT || 443;
 const DOMAIN = 'bssc-rpc.bssc.live';
 
 // Official Contract Addresses
