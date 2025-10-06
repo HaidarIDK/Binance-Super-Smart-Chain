@@ -18,7 +18,36 @@ const OFFICIAL_CONTRACTS = {
     }
 };
 
-// Enhanced mock responses for BSSC RPC
+// BSSC Validator RPC URL (update this when validator is deployed)
+const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://localhost:8899';
+
+// Function to call real BSSC validator
+async function callBSSCValidator(method, params = []) {
+    try {
+        const response = await fetch(BSSC_VALIDATOR_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: method,
+                params: params
+            })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data;
+        }
+    } catch (error) {
+        console.log(`BSSC Validator not available: ${error.message}`);
+    }
+    
+    // Fallback to mock responses if validator not available
+    return null;
+}
+
+// Enhanced mock responses for BSSC RPC (fallback when validator not available)
 const mockResponses = {
     getHealth: {
         jsonrpc: "2.0",
@@ -414,18 +443,28 @@ function handleRequest(req, res) {
         body += chunk.toString();
     });
     
-    req.on('end', () => {
+    req.on('end', async () => {
         try {
             const request = JSON.parse(body);
             const method = request.method;
+            const params = request.params || [];
             const id = request.id || 1;
             
             console.log(`[${new Date().toISOString()}] ${DOMAIN} RPC Request: ${method} from ${req.connection.remoteAddress}`);
             
             let response;
-            if (mockResponses[method]) {
+            
+            // Try to get real data from BSSC validator first
+            const realData = await callBSSCValidator(method, params);
+            if (realData) {
+                response = realData;
+                response.id = id;
+                console.log(`Using real BSSC validator data for ${method}`);
+            } else if (mockResponses[method]) {
+                // Fallback to mock responses
                 response = {...mockResponses[method]};
                 response.id = id;
+                console.log(`Using mock data for ${method} (validator not available)`);
             } else {
                 response = {
                     jsonrpc: "2.0",
