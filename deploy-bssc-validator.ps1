@@ -217,8 +217,8 @@ Write-Host "3. BSSC validator will be running on port 8899" -ForegroundColor Whi
 Write-Host ""
 
 Write-Host "Upload command:" -ForegroundColor Cyan
-Write-Host "scp -r $deployDir $SERVER_USER@$SERVER_IP:/tmp/" -ForegroundColor White
+Write-Host "scp -r ${deployDir} ${SERVER_USER}@${SERVER_IP}:/tmp/" -ForegroundColor White
 Write-Host ""
 Write-Host "SSH command:" -ForegroundColor Cyan
-Write-Host "ssh $SERVER_USER@$SERVER_IP" -ForegroundColor White
-Write-Host "cd /tmp/$deployDir && chmod +x install-bssc.sh && ./install-bssc.sh" -ForegroundColor White
+Write-Host "ssh ${SERVER_USER}@${SERVER_IP}" -ForegroundColor White
+Write-Host "cd /tmp/${deployDir} && chmod +x install-bssc.sh && ./install-bssc.sh" -ForegroundColor White

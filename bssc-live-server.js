@@ -21,6 +21,61 @@ const OFFICIAL_CONTRACTS = {
 // BSSC Validator RPC URL (update this when validator is deployed)
 const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://localhost:8899';
 
+// In-memory transaction and receipt storage (for EVM-on-Solana option)
+const transactionStore = new Map();
+const receiptStore = new Map();
+const logStore = new Map();
+let currentBlockNumber = 0;
+let currentBlockHash = '0x' + '0'.repeat(64);
+
+// Generate a mock transaction hash
+function generateTxHash() {
+    return '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+
+// Generate a mock block hash
+function generateBlockHash() {
+    return '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+}
+
+// Create a mock transaction receipt
+function createMockReceipt(txHash, blockNumber, blockHash, status = '0x1') {
+    return {
+        transactionHash: txHash,
+        transactionIndex: '0x0',
+        blockHash: blockHash,
+        blockNumber: '0x' + blockNumber.toString(16),
+        from: '0x' + '0'.repeat(40),
+        to: '0x' + '0'.repeat(40),
+        cumulativeGasUsed: '0x5208',
+        gasUsed: '0x5208',
+        contractAddress: null,
+        logs: [],
+        logsBloom: '0x' + '0'.repeat(512),
+        status: status
+    };
+}
+
+// Create a mock transaction
+function createMockTransaction(txHash, rawTx) {
+    return {
+        hash: txHash,
+        nonce: '0x0',
+        blockHash: currentBlockHash,
+        blockNumber: '0x' + currentBlockNumber.toString(16),
+        transactionIndex: '0x0',
+        from: '0x' + '0'.repeat(40),
+        to: '0x' + '0'.repeat(40),
+        value: '0x0',
+        gas: '0x5208',
+        gasPrice: '0x5d21dba00',
+        input: '0x',
+        v: '0x0',
+        r: '0x' + '0'.repeat(64),
+        s: '0x' + '0'.repeat(64)
+    };
+}
+
 // Function to call real BSSC validator
 async function callBSSCValidator(method, params = []) {
     try {
@@ -158,6 +213,26 @@ const mockResponses = {
         jsonrpc: "2.0",
         id: 1,
         result: "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    eth_sendRawTransaction: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: null // Will be set dynamically
+    },
+    eth_getTransactionByHash: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: null // Will be set dynamically
+    },
+    eth_getTransactionReceipt: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: null // Will be set dynamically
+    },
+    eth_getLogs: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: [] // Will be set dynamically
     }
 };
 
@@ -347,6 +422,10 @@ function handleRequest(req, res) {
                 <div class="method">eth_getBalance - Get account balance</div>
                 <div class="method">eth_gasPrice - Get gas price</div>
                 <div class="method">eth_estimateGas - Estimate gas</div>
+                <div class="method">eth_sendRawTransaction - Send raw transaction</div>
+                <div class="method">eth_getTransactionByHash - Get transaction by hash</div>
+                <div class="method">eth_getTransactionReceipt - Get transaction receipt</div>
+                <div class="method">eth_getLogs - Get event logs</div>
                 
                 <h2>Contract Methods</h2>
                 <div class="method">getContractInfo - Get all official contracts</div>
@@ -361,6 +440,8 @@ function handleRequest(req, res) {
             <button class="test-button" onclick="testRPC('getVersion')">Test Version</button>
             <button class="test-button" onclick="testRPC('eth_chainId')">Test Chain ID</button>
             <button class="test-button" onclick="testRPC('getPumpContractInfo')">Get PUMP Contract</button>
+            <button class="test-button" onclick="testEVMTransaction()">Test EVM Transaction</button>
+            <button class="test-button" onclick="testEVMReceipt()">Test EVM Receipt</button>
             <div id="test-result" style="margin-top: 15px;"></div>
         </div>
         
@@ -423,6 +504,65 @@ function handleRequest(req, res) {
             
             document.body.removeChild(textArea);
         }
+        
+        async function testEVMTransaction() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<p>Testing EVM Transaction...</p>';
+            
+            try {
+                // Create a mock raw transaction
+                const rawTx = '0xf86c808502540be400825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83';
+                
+                const response = await fetch('https://${DOMAIN}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method: 'eth_sendRawTransaction',
+                        params: [rawTx]
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = '<pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef;">' + JSON.stringify(data, null, 2) + '</pre>';
+                
+                // Store the transaction hash for receipt testing
+                if (data.result) {
+                    window.lastTxHash = data.result;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
+            }
+        }
+        
+        async function testEVMReceipt() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<p>Testing EVM Receipt...</p>';
+            
+            if (!window.lastTxHash) {
+                resultDiv.innerHTML = '<p style="color: #dc3545;">No transaction hash available. Run Test EVM Transaction first.</p>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('https://${DOMAIN}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method: 'eth_getTransactionReceipt',
+                        params: [window.lastTxHash]
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = '<pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef;">' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
+            }
+        }
     </script>
 </body>
 </html>`;
@@ -454,26 +594,112 @@ function handleRequest(req, res) {
             
             let response;
             
-            // Try to get real data from BSSC validator first
-            const realData = await callBSSCValidator(method, params);
-            if (realData) {
-                response = realData;
-                response.id = id;
-                console.log(`Using real BSSC validator data for ${method}`);
-            } else if (mockResponses[method]) {
-                // Fallback to mock responses
-                response = {...mockResponses[method]};
-                response.id = id;
-                console.log(`Using mock data for ${method} (validator not available)`);
-            } else {
+            // Handle EVM transaction methods with in-memory storage
+            if (method === 'eth_sendRawTransaction') {
+                const rawTx = params[0];
+                const txHash = generateTxHash();
+                
+                // Store transaction and receipt
+                const mockTx = createMockTransaction(txHash, rawTx);
+                const mockReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash);
+                
+                transactionStore.set(txHash, mockTx);
+                receiptStore.set(txHash, mockReceipt);
+                
+                // Increment block number for next transaction
+                currentBlockNumber++;
+                currentBlockHash = generateBlockHash();
+                
                 response = {
                     jsonrpc: "2.0",
                     id: id,
-                    error: {
-                        code: -32601,
-                        message: `Method '${method}' not found`
-                    }
+                    result: txHash
                 };
+                console.log(`Stored transaction ${txHash} in block ${currentBlockNumber - 1}`);
+                
+            } else if (method === 'eth_getTransactionByHash') {
+                const txHash = params[0];
+                const tx = transactionStore.get(txHash);
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: tx || null
+                };
+                
+            } else if (method === 'eth_getTransactionReceipt') {
+                const txHash = params[0];
+                const receipt = receiptStore.get(txHash);
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: receipt || null
+                };
+                
+            } else if (method === 'eth_getLogs') {
+                const filter = params[0] || {};
+                const logs = [];
+                
+                // Simple log filtering by address and block range
+                for (const [txHash, receipt] of receiptStore) {
+                    if (receipt.logs && receipt.logs.length > 0) {
+                        for (const log of receipt.logs) {
+                            let includeLog = true;
+                            
+                            if (filter.address && log.address !== filter.address) {
+                                includeLog = false;
+                            }
+                            
+                            if (filter.fromBlock && parseInt(receipt.blockNumber, 16) < parseInt(filter.fromBlock, 16)) {
+                                includeLog = false;
+                            }
+                            
+                            if (filter.toBlock && parseInt(receipt.blockNumber, 16) > parseInt(filter.toBlock, 16)) {
+                                includeLog = false;
+                            }
+                            
+                            if (includeLog) {
+                                logs.push({
+                                    ...log,
+                                    transactionHash: txHash,
+                                    blockHash: receipt.blockHash,
+                                    blockNumber: receipt.blockNumber,
+                                    transactionIndex: receipt.transactionIndex
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: logs
+                };
+                
+            } else {
+                // Try to get real data from BSSC validator first
+                const realData = await callBSSCValidator(method, params);
+                if (realData) {
+                    response = realData;
+                    response.id = id;
+                    console.log(`Using real BSSC validator data for ${method}`);
+                } else if (mockResponses[method]) {
+                    // Fallback to mock responses
+                    response = {...mockResponses[method]};
+                    response.id = id;
+                    console.log(`Using mock data for ${method} (validator not available)`);
+                } else {
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        error: {
+                            code: -32601,
+                            message: `Method '${method}' not found`
+                        }
+                    };
+                }
             }
             
             res.writeHead(200, {'Content-Type': 'application/json'});
