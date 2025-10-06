@@ -34,7 +34,7 @@ export default function Footer() {
   const socialLinks = [
     { icon: Github, href: 'https://github.com/HaidarIDK/Binance-Super-Smart-Chain', label: 'GitHub' },
     { icon: Twitter, href: 'https://x.com/bnbsolfork', label: 'Twitter' },
-    { icon: Mail, href: 'mailto:contact@bssc.binance.org', label: 'Email' }
+    { icon: Mail, href: 'mailto:Haidaridk@proton.me', label: 'Email' }
   ]
 
   return (
@@ -147,7 +147,7 @@ export default function Footer() {
         >
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="text-gray-400 text-sm">
-              © 2024 Binance Super Smart Chain. All rights reserved.
+              © 2025 Binance Super Smart Chain. All rights reserved.
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
               <span>Built with ❤️ on Solana</span>

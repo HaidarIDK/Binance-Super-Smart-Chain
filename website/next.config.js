@@ -5,8 +5,9 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/Binance-Super-Smart-Chain' : '',
-  basePath: process.env.NODE_ENV === 'production' ? '/Binance-Super-Smart-Chain' : ''
+  // Configure for bssc.live domain
+  assetPrefix: '',
+  basePath: ''
 }
 
 module.exports = nextConfig
