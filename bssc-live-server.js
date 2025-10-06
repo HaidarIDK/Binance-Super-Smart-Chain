@@ -167,46 +167,141 @@ function handleRequest(req, res) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BSSC Live RPC Server - ${DOMAIN}</title>
+    <title>BSSC RPC Server - ${DOMAIN}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; text-align: center; }
-        .status { background: #27ae60; color: white; padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; margin: 20px 0; }
-        .endpoint { background: #ecf0f1; padding: 15px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #3498db; }
-        .method { background: #f8f9fa; padding: 12px; margin: 8px 0; border-radius: 6px; font-family: 'Courier New', monospace; border: 1px solid #e9ecef; }
-        .warning { background: #f39c12; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
-        .success { background: #27ae60; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
-        .test-button { background: #3498db; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .test-button:hover { background: #2980b9; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+            min-height: 100vh; 
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { 
+            color: #333; 
+            border-bottom: 2px solid #ddd; 
+            padding-bottom: 15px; 
+            text-align: center; 
+            margin-bottom: 30px;
+        }
+        .status { 
+            background: #d4edda; 
+            color: #155724; 
+            padding: 15px; 
+            border-radius: 4px; 
+            text-align: center; 
+            font-weight: bold; 
+            margin: 20px 0; 
+            border: 1px solid #c3e6cb;
+        }
+        .endpoint { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 4px; 
+            border-left: 4px solid #007bff; 
+        }
+        .method { 
+            background: #f8f9fa; 
+            padding: 12px; 
+            margin: 8px 0; 
+            border-radius: 4px; 
+            font-family: 'Courier New', monospace; 
+            border: 1px solid #e9ecef; 
+        }
+        .info { 
+            background: #d1ecf1; 
+            color: #0c5460; 
+            padding: 20px; 
+            border-radius: 4px; 
+            margin: 20px 0; 
+            border: 1px solid #bee5eb;
+        }
+        .contract { 
+            background: #f8d7da; 
+            color: #721c24; 
+            padding: 20px; 
+            border-radius: 4px; 
+            margin: 20px 0; 
+            border: 1px solid #f5c6cb;
+        }
+        .test-button { 
+            background: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin: 5px; 
+            font-size: 14px;
+        }
+        .test-button:hover { 
+            background: #0056b3; 
+        }
+        .copy-button {
+            background: #28a745;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .copy-button:hover {
+            background: #1e7e34;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+        }
+        .contract-address {
+            font-family: monospace;
+            background: rgba(0,0,0,0.1);
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        @media (max-width: 768px) { 
+            .grid { 
+                grid-template-columns: 1fr; 
+            } 
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 BSSC Live RPC Server</h1>
-        <div class="status">✅ Server Status: Online & Ready</div>
+        <h1>BSSC RPC Server</h1>
+        <div class="status">Server Status: Online & Ready</div>
         
-        <div class="success">
-            <h3>🌐 Your RPC Endpoint is Live!</h3>
+        <div class="info">
+            <h3>RPC Endpoint Information</h3>
             <p><strong>Domain:</strong> ${DOMAIN}</p>
             <p><strong>RPC URL:</strong> https://${DOMAIN}</p>
             <p><strong>Chain ID:</strong> 56 (Binance Smart Chain)</p>
         </div>
         
-        <div class="warning" style="background: #e74c3c; color: white;">
-            <h3>🚀 Official PUMP Coin Contract</h3>
-            <p><strong>Contract Address:</strong> <span style="font-family: monospace; background: rgba(255,255,255,0.2); padding: 5px; border-radius: 3px;">EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump</span></p>
+        <div class="contract">
+            <h3>Official PUMP Coin Contract</h3>
+            <p><strong>Contract Address:</strong></p>
+            <div class="contract-address">EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump</div>
             <p><strong>Token:</strong> Official Pump Coin (PUMP)</p>
             <p><strong>Network:</strong> BSSC (Binance Smart Chain)</p>
-            <button class="test-button" onclick="copyContractAddress()" style="margin-top: 10px;">📋 Copy Address</button>
+            <button class="copy-button" onclick="copyContractAddress()">Copy Address</button>
         </div>
         
         <div class="grid">
             <div>
-                <h2>📊 Solana Methods</h2>
+                <h2>Solana Methods</h2>
                 <div class="method">getHealth - Check server health</div>
                 <div class="method">getVersion - Get server version</div>
                 <div class="method">getSlot - Get current slot</div>
@@ -216,7 +311,7 @@ function handleRequest(req, res) {
             </div>
             
             <div>
-                <h2>🌐 Web3/Ethereum Methods</h2>
+                <h2>Web3/Ethereum Methods</h2>
                 <div class="method">eth_blockNumber - Get block number</div>
                 <div class="method">eth_chainId - Get chain ID (56)</div>
                 <div class="method">net_version - Get network version</div>
@@ -224,7 +319,7 @@ function handleRequest(req, res) {
                 <div class="method">eth_gasPrice - Get gas price</div>
                 <div class="method">eth_estimateGas - Estimate gas</div>
                 
-                <h2>🚀 Contract Methods</h2>
+                <h2>Contract Methods</h2>
                 <div class="method">getContractInfo - Get all official contracts</div>
                 <div class="method">getPumpContractInfo - Get PUMP coin info</div>
                 <div class="method">getOfficialContracts - List official contracts</div>
@@ -232,16 +327,16 @@ function handleRequest(req, res) {
         </div>
         
         <div class="endpoint">
-            <h3>🧪 Test Your RPC Endpoint</h3>
+            <h3>Test Your RPC Endpoint</h3>
             <button class="test-button" onclick="testRPC('getHealth')">Test Health</button>
             <button class="test-button" onclick="testRPC('getVersion')">Test Version</button>
             <button class="test-button" onclick="testRPC('eth_chainId')">Test Chain ID</button>
-            <button class="test-button" onclick="testRPC('getPumpContractInfo')" style="background: #e74c3c;">🚀 Get PUMP Contract</button>
+            <button class="test-button" onclick="testRPC('getPumpContractInfo')">Get PUMP Contract</button>
             <div id="test-result" style="margin-top: 15px;"></div>
         </div>
         
-        <div class="warning">
-            ⚠️ This is a development server with mock responses.<br>
+        <div class="info">
+            <strong>Note:</strong> This is a development server with mock responses.<br>
             For production use, replace with actual blockchain node.
         </div>
     </div>
@@ -263,9 +358,9 @@ function handleRequest(req, res) {
                 });
                 
                 const data = await response.json();
-                resultDiv.innerHTML = '<pre style="background: #f8f9fa; padding: 10px; border-radius: 5px;">' + JSON.stringify(data, null, 2) + '</pre>';
+                resultDiv.innerHTML = '<pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef;">' + JSON.stringify(data, null, 2) + '</pre>';
             } catch (error) {
-                resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+                resultDiv.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
             }
         }
         
@@ -274,7 +369,7 @@ function handleRequest(req, res) {
             
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(contractAddress).then(() => {
-                    alert('✅ PUMP Contract Address Copied to Clipboard!\\n\\n' + contractAddress);
+                    alert('PUMP Contract Address Copied to Clipboard!\\n\\n' + contractAddress);
                 }).catch(err => {
                     fallbackCopyTextToClipboard(contractAddress);
                 });
@@ -292,9 +387,9 @@ function handleRequest(req, res) {
             
             try {
                 document.execCommand('copy');
-                alert('✅ PUMP Contract Address Copied!\\n\\n' + text);
+                alert('PUMP Contract Address Copied!\\n\\n' + text);
             } catch (err) {
-                alert('❌ Failed to copy. Please copy manually:\\n\\n' + text);
+                alert('Failed to copy. Please copy manually:\\n\\n' + text);
             }
             
             document.body.removeChild(textArea);
