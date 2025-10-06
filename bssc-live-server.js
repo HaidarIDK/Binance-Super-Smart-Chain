@@ -449,31 +449,46 @@ try {
     console.log('✅ New SSL certificates generated for', DOMAIN);
 }
 
-// Create HTTP server (redirects to HTTPS)
+// Create HTTP server (redirects to HTTPS only if not on Render)
 const httpServer = http.createServer((req, res) => {
-    // Redirect HTTP to HTTPS
-    const httpsUrl = `https://${DOMAIN}${req.url}`;
-    res.writeHead(301, {'Location': httpsUrl});
-    res.end();
+    // Only redirect to HTTPS if not on Render (Render handles SSL termination)
+    if (process.env.RENDER && req.headers['x-forwarded-proto'] !== 'https') {
+        const httpsUrl = `https://${req.headers.host}${req.url}`;
+        res.writeHead(301, {'Location': httpsUrl});
+        res.end();
+    } else {
+        // Handle request normally on Render
+        handleRequest(req, res);
+    }
 });
 
 // Create HTTPS server
 const httpsServer = https.createServer(serverOptions, handleRequest);
 
-// Start HTTP server (port 80)
-httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server running on port ${HTTP_PORT} (redirects to HTTPS)`);
-});
+// Start server based on environment
+if (process.env.RENDER) {
+    // On Render, only start HTTP server (Render handles SSL termination)
+    httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
+        console.log(`🌐 RPC Server running on port ${HTTP_PORT} (Render)`);
+        console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
+        console.log(`🌐 CORS enabled for web3 applications`);
+        console.log(`🔒 Security headers enabled`);
+    });
+} else {
+    // On local/server, start both HTTP and HTTPS
+    httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
+        console.log(`🌐 HTTP Server running on port ${HTTP_PORT} (redirects to HTTPS)`);
+    });
 
-// Start HTTPS server (port 443)
-httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
-    console.log(`🔒 HTTPS RPC Server running on https://${DOMAIN}`);
-    console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
-    console.log(`🌐 CORS enabled for web3 applications`);
-    console.log(`🔒 Security headers enabled`);
-    console.log(`📖 Documentation: https://${DOMAIN}/`);
-    console.log(`⏹️  Press Ctrl+C to stop`);
-});
+    httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+        console.log(`🔒 HTTPS RPC Server running on https://${DOMAIN}`);
+        console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
+        console.log(`🌐 CORS enabled for web3 applications`);
+        console.log(`🔒 Security headers enabled`);
+        console.log(`📖 Documentation: https://${DOMAIN}/`);
+        console.log(`⏹️  Press Ctrl+C to stop`);
+    });
+}
 
 // Graceful shutdown
 process.on('SIGINT', () => {
