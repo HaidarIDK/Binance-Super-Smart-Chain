@@ -11,7 +11,7 @@ Write-Host "Testing Binance Super Smart Chain - Solana Performance with BNB Gas 
 Write-Host ""
 
 # Configuration
-$RPC_URL = "https://bssc.live"
+$RPC_URL = "https://bssc-rpc.bssc.live"
 $LOCAL_RPC = "http://localhost:8899"
 $TEST_RESULTS = @()
 

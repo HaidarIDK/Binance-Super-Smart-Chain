@@ -66,7 +66,7 @@ curl -X POST https://bssc.live \
 ```
 
 ## 📊 Your Public RPC Endpoints
-- **Main RPC**: https://bssc.live
+- **Main RPC**: https://bssc-rpc.bssc.live
 - **Health Check**: https://bssc.live/health
 - **Documentation**: https://bssc.live/
 

@@ -65,7 +65,7 @@ export default function DeveloperTools() {
       title: 'Configure Network',
       description: 'Add BSSC network to your configuration',
       code: `network: "bssc",
-rpc: "https://api.bssc.binance.org",
+rpc: "https://bssc-rpc.bssc.live",
 chainId: 9701`
     },
     {

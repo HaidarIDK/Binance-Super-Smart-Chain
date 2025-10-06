@@ -53,7 +53,7 @@ After DNS propagation (5-30 minutes):
 - API Docs: https://bssc.live/
 
 ## 📊 RPC Endpoints
-- Main RPC: https://bssc.live
+- Main RPC: https://bssc-rpc.bssc.live
 - Health Check: https://bssc.live/health
 - Documentation: https://bssc.live/
 

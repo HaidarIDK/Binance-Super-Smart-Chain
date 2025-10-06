@@ -3,7 +3,7 @@
 ## 🌐 Your Server Information
 - **Domain**: bssc.live
 - **Public IP**: 109.147.47.132
-- **RPC Endpoint**: https://bssc.live
+- **RPC Endpoint**: https://bssc-rpc.bssc.live
 
 ## 📋 DNS Records to Configure
 
@@ -93,7 +93,7 @@ curl -k -X POST -H "Content-Type: application/json" \
 
 Once configured, your RPC endpoints will be:
 
-- **Main RPC**: https://bssc.live
+- **Main RPC**: https://bssc-rpc.bssc.live
 - **API Documentation**: https://bssc.live/
 - **Health Check**: https://bssc.live/health
 

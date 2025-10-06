@@ -3,7 +3,7 @@ Write-Host "🌐 Launching BSSC RPC Server for bssc.live..." -ForegroundColor Gr
 Write-Host ""
 
 # Configuration
-$DOMAIN = "bssc.live"
+$DOMAIN = "bssc-rpc.bssc.live"
 $PUBLIC_IP = "109.147.47.132"
 $HTTP_PORT = 80
 $HTTPS_PORT = 443

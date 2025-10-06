@@ -5,7 +5,7 @@ const fs = require('fs');
 
 const HTTP_PORT = 80;
 const HTTPS_PORT = 443;
-const DOMAIN = 'bssc.live';
+const DOMAIN = 'bssc-rpc.bssc.live';
 
 // Official Contract Addresses
 const OFFICIAL_CONTRACTS = {
