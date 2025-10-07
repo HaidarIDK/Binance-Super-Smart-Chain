@@ -14,7 +14,7 @@ const OFFICIAL_CONTRACTS = {
         name: 'Official Pump Coin',
         symbol: 'PUMP',
         description: 'The official pump coin on BSSC',
-        chainId: 97
+        chainId: 9000
     }
 };
 
@@ -165,12 +165,12 @@ const mockResponses = {
     eth_chainId: {
         jsonrpc: "2.0",
         id: 1,
-        result: "0x61" // BSSC Testnet Chain ID 97
+        result: "0x2328" // BSSC Testnet Chain ID 9000
     },
     net_version: {
         jsonrpc: "2.0",
         id: 1,
-        result: "97"
+        result: "9000"
     },
     eth_getBalance: {
         jsonrpc: "2.0",
