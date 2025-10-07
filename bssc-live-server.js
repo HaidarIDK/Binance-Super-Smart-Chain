@@ -28,6 +28,89 @@ const logStore = new Map();
 let currentBlockNumber = 0;
 let currentBlockHash = '0x' + '0'.repeat(64);
 
+// BNB token on Solana tracking
+const BNB_TOKEN_ADDRESS = 'BNBTokenSolanaBSSC1111111111111111111111111';
+const bnbBalances = new Map();
+
+// BNB to SOL exchange rate
+const BNB_TO_SOL_RATE = 5;
+
+// Persistent storage file
+const STORAGE_FILE = 'bssc-data.json';
+
+// Load persistent data
+function loadPersistentData() {
+    try {
+        if (fs.existsSync(STORAGE_FILE)) {
+            const data = JSON.parse(fs.readFileSync(STORAGE_FILE, 'utf8'));
+            
+            // Load BNB balances
+            if (data.bnbBalances) {
+                Object.entries(data.bnbBalances).forEach(([addr, balance]) => {
+                    bnbBalances.set(addr, balance);
+                });
+            }
+            
+            // Load transactions
+            if (data.transactions) {
+                Object.entries(data.transactions).forEach(([hash, tx]) => {
+                    transactionStore.set(hash, tx);
+                });
+            }
+            
+            // Load receipts
+            if (data.receipts) {
+                Object.entries(data.receipts).forEach(([hash, receipt]) => {
+                    receiptStore.set(hash, receipt);
+                });
+            }
+            
+            // Load current block number
+            if (data.currentBlockNumber) {
+                currentBlockNumber = data.currentBlockNumber;
+            }
+            
+            console.log('Loaded persistent data from ' + STORAGE_FILE);
+        } else {
+            // Initialize default balances
+            bnbBalances.set('F6iwdHyHi5KfEVKETtmnuKHZPX9T43rCVjHk8UTxGZDA', 5);
+        }
+    } catch (error) {
+        console.error('Error loading persistent data:', error.message);
+        // Initialize default balances
+        bnbBalances.set('F6iwdHyHi5KfEVKETtmnuKHZPX9T43rCVjHk8UTxGZDA', 5);
+    }
+}
+
+// Save persistent data
+function savePersistentData() {
+    try {
+        const data = {
+            bnbBalances: Object.fromEntries(bnbBalances),
+            transactions: Object.fromEntries(transactionStore),
+            receipts: Object.fromEntries(receiptStore),
+            currentBlockNumber: currentBlockNumber,
+            lastSaved: new Date().toISOString()
+        };
+        
+        fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Error saving persistent data:', error.message);
+    }
+}
+
+// Load data on startup
+loadPersistentData();
+
+// Auto-save every 30 seconds
+setInterval(savePersistentData, 30000);
+
+// Track transaction timestamps
+const transactionTimestamps = new Map();
+
+// Track address transaction counts (nonces)
+const addressNonces = new Map();
+
 // Generate a mock transaction hash
 function generateTxHash() {
     return '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -175,7 +258,7 @@ const mockResponses = {
     eth_getBalance: {
         jsonrpc: "2.0",
         id: 1,
-        result: "0x1bc16d674ec80000" // 2 ETH in hex
+        result: "0x1bc16d674ec80000" // 2 BNB in hex
     },
     eth_gasPrice: {
         jsonrpc: "2.0",
@@ -241,6 +324,30 @@ const mockResponses = {
             success: true,
             txHash: null, // Will be set dynamically
             amount: "1000000000000000000" // 1 BNB
+        }
+    },
+    // BNB Token on Solana methods
+    getBNBBalance: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+            address: "",
+            bnbBalance: 0,
+            solEquivalent: 0,
+            tokenAddress: BNB_TOKEN_ADDRESS
+        }
+    },
+    getBNBTokenInfo: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+            name: "BNB Token on Solana",
+            symbol: "BNB",
+            decimals: 9,
+            totalSupply: 1000000,
+            tokenAddress: BNB_TOKEN_ADDRESS,
+            exchangeRate: BNB_TO_SOL_RATE,
+            description: "BNB token on Solana network - BSSC implementation"
         }
     }
 };
@@ -647,6 +754,11 @@ function handleRequest(req, res) {
                 
                 transactionStore.set(txHash, mockTx);
                 receiptStore.set(txHash, mockReceipt);
+                transactionTimestamps.set(txHash, Date.now());
+                
+                // Increment nonce for sender address
+                const senderAddress = mockTx.from;
+                addressNonces.set(senderAddress, (addressNonces.get(senderAddress) || 0) + 1);
                 
                 // Increment block number for next transaction
                 currentBlockNumber++;
@@ -658,6 +770,18 @@ function handleRequest(req, res) {
                     result: txHash
                 };
                 console.log(`Stored transaction ${txHash} in block ${currentBlockNumber - 1}`);
+                savePersistentData();
+                
+            } else if (method === 'eth_getTransactionCount') {
+                // Get transaction count (nonce) for address
+                const address = params[0];
+                const nonce = addressNonces.get(address) || 0;
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: '0x' + nonce.toString(16)
+                };
                 
             } else if (method === 'eth_getTransactionByHash') {
                 const txHash = params[0];
@@ -777,7 +901,106 @@ function handleRequest(req, res) {
                     };
                     
                     console.log(`Faucet request: Sent 1 BNB to ${address}, tx: ${txHash}`);
+                    savePersistentData();
                 }
+                
+            } else if (method === 'getBNBBalance') {
+                // Get BNB token balance on Solana
+                const address = params[0];
+                const balance = bnbBalances.get(address) || 0;
+                const solEquivalent = balance * BNB_TO_SOL_RATE;
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        address: address,
+                        bnbBalance: balance,
+                        solEquivalent: solEquivalent,
+                        tokenAddress: BNB_TOKEN_ADDRESS,
+                        decimals: 9,
+                        formatted: `${balance.toFixed(6)} BNB (~${solEquivalent.toFixed(6)} SOL)`
+                    }
+                };
+                
+                console.log(`BNB Balance check: ${address} has ${balance} BNB`);
+                
+            } else if (method === 'transferBNB') {
+                // Transfer BNB tokens on Solana
+                const [from, to, amount] = params;
+                const fromBalance = bnbBalances.get(from) || 0;
+                
+                if (fromBalance >= amount) {
+                    bnbBalances.set(from, fromBalance - amount);
+                    bnbBalances.set(to, (bnbBalances.get(to) || 0) + amount);
+                    
+                    const txHash = generateTxHash();
+                    
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: {
+                            success: true,
+                            from: from,
+                            to: to,
+                            amount: amount,
+                            txHash: txHash,
+                            message: `Transferred ${amount} BNB from ${from} to ${to}`
+                        }
+                    };
+                    
+                    console.log(`BNB Transfer: ${amount} BNB from ${from} to ${to}, tx: ${txHash}`);
+                    savePersistentData();
+                } else {
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        error: {
+                            code: -32000,
+                            message: `Insufficient BNB balance. Have: ${fromBalance}, Need: ${amount}`
+                        }
+                    };
+                }
+                
+            } else if (method === 'getBNBTokenInfo') {
+                // Get BNB token information
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        name: "BNB Token on Solana",
+                        symbol: "BNB",
+                        decimals: 9,
+                        totalSupply: Array.from(bnbBalances.values()).reduce((a, b) => a + b, 0),
+                        tokenAddress: BNB_TOKEN_ADDRESS,
+                        exchangeRate: BNB_TO_SOL_RATE,
+                        description: "BNB token on Solana network - BSSC implementation",
+                        holders: bnbBalances.size
+                    }
+                };
+                
+            } else if (method === 'requestBNBAirdrop') {
+                // Request BNB airdrop (like Solana's requestAirdrop)
+                const address = params[0];
+                const amount = params[1] || 1; // Default 1 BNB
+                
+                bnbBalances.set(address, (bnbBalances.get(address) || 0) + amount);
+                const txHash = generateTxHash();
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        success: true,
+                        signature: txHash,
+                        amount: amount,
+                        to: address,
+                        message: `Airdropped ${amount} BNB to ${address}`
+                    }
+                };
+                
+                console.log(`BNB Airdrop: ${amount} BNB to ${address}, tx: ${txHash}`);
+                savePersistentData();
                 
             } else {
                 // Try to get real data from BSSC validator first

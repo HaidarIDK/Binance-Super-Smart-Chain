@@ -67,6 +67,92 @@ yarn-error.log*
 .env.production
 .env.development
 
+# Wallet private keys (NEVER commit these!)
+.wallet-key
+*-private-key.txt
+wallet.json
+wallet-*.json
+private-key.*
+wallet-quick-ref.txt
+
+# BSSC data storage (persistent RPC data)
+bssc-data.json
+last-tx-hash.txt
+
+# Temporary test and deployment files
+test-*.html
+test-*.ps1
+test-*.js
+test-*.json
+test-*.sh
+test-*.py
+send-*.html
+send-*.ps1
+send-*.js
+setup-*.html
+setup-*.ps1
+deploy-*.ps1
+deploy-*.sh
+launch*.ps1
+launch*.bat
+upload-*.ps1
+run-*.ps1
+check-*.ps1
+check-*.json
+connect-*.js
+view-*.html
+*-test.html
+*-viewer.html
+*-explorer.html
+*-dashboard.html
+
+# Temporary documentation files
+MY_*.txt
+MY_*.md
+CLEANUP_*.md
+QUICK_FIX*.md
+QUICK_*.md
+CURRENT_STATUS.md
+SUMMARY.md
+REALITY_CHECK.md
+EASY_SOLUTION.md
+START_*.md
+RESTART_*.md
+SHOW_*.md
+INSTALL_*.md
+DOWNLOAD_*.md
+DNS_*.md
+DEPLOY_*.md
+BUILD_*.md
+BSSC_*.md
+BNB_*.md
+WALLET_*.md
+METAMASK_*.md
+TRANSACTION_*.md
+TERMINAL_*.md
+SEND_*.md
+ADD_*.md
+CONNECT_*.md
+create-*.md
+force-*.md
+
+# Old configuration files
+cloudflare-tunnel-config.yml
+railway.json
+nginx-*.conf
+vercel.json
+
+# Old/unused server files
+https-rpc-server.js
+production-https-server.js
+simple-https-server.js
+simple-rpc-server.js
+generate-ssl-certs.js
+
+# Build logs
+build.log
+*.log
+
 # IDE files
 .vscode/
 .idea/
