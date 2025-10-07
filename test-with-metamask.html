@@ -146,7 +146,7 @@
                 <dt>RPC URL:</dt>
                 <dd>https://bssc-rpc.bssc.live</dd>
                 <dt>Chain ID:</dt>
-                <dd>9000 (0x2328)</dd>
+                <dd>16979 (0x4253)</dd>
                 <dt>Currency:</dt>
                 <dd>BNB</dd>
             </dl>
@@ -199,7 +199,7 @@
                 await window.ethereum.request({
                     method: 'wallet_addEthereumChain',
                     params: [{
-                        chainId: '0x2328',
+                        chainId: '0x4253',
                         chainName: 'BSSC Testnet',
                         nativeCurrency: {
                             name: 'BNB',
@@ -224,9 +224,9 @@
             try {
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x2328' }]
+                    params: [{ chainId: '0x4253' }]
                 });
-                showResult('✓ Switched to BSSC Testnet!\nChain ID: 9000');
+                showResult('✓ Switched to BSSC Testnet!\nChain ID: 16979');
             } catch (error) {
                 if (error.code === 4902) {
                     showResult('BSSC network not added yet. Click "Add BSSC Network" first.');

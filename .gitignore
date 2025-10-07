@@ -76,3 +76,20 @@ yarn-error.log*
 # OS files
 Thumbs.db
 .DS_Store
+
+# Test and temporary files
+test-*.html
+test-*.ps1
+test-*.js
+send-*.html
+MY_*.txt
+*_test.html
+CLEANUP_*.md
+QUICK_FIX*.md
+CURRENT_STATUS.md
+SUMMARY.md
+force-*.md
+
+# Old deployment artifacts
+bssc-validator-deploy/
+bssc-live-website/
