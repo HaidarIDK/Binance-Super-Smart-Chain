@@ -400,7 +400,7 @@ function handleRequest(req, res) {
             <h3>RPC Endpoint Information</h3>
             <p><strong>Domain:</strong> ${DOMAIN}</p>
             <p><strong>RPC URL:</strong> https://${DOMAIN}</p>
-            <p><strong>Chain ID:</strong> 56 (Binance Smart Chain)</p>
+            <p><strong>Chain ID: ...  </strong> </p>
         </div>
         
         <div class="contract">
@@ -426,7 +426,7 @@ function handleRequest(req, res) {
             <div>
                 <h2>Web3/Ethereum Methods</h2>
                 <div class="method">eth_blockNumber - Get block number</div>
-                <div class="method">eth_chainId - Get chain ID (56)</div>
+                <div class="method">eth_chainId - Get chain ID (16979)</div>
                 <div class="method">net_version - Get network version</div>
                 <div class="method">eth_getBalance - Get account balance</div>
                 <div class="method">eth_gasPrice - Get gas price</div>
