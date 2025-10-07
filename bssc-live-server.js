@@ -19,7 +19,7 @@ const OFFICIAL_CONTRACTS = {
 };
 
 // BSSC Validator RPC URL (update this when validator is deployed)
-const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://localhost:8899';
+const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://109.147.47.132:8899';
 
 // In-memory transaction and receipt storage (for EVM-on-Solana option)
 const transactionStore = new Map();
@@ -233,6 +233,15 @@ const mockResponses = {
         jsonrpc: "2.0",
         id: 1,
         result: [] // Will be set dynamically
+    },
+    eth_requestFaucet: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+            success: true,
+            txHash: null, // Will be set dynamically
+            amount: "1000000000000000000" // 1 BNB
+        }
     }
 };
 
@@ -426,6 +435,7 @@ function handleRequest(req, res) {
                 <div class="method">eth_getTransactionByHash - Get transaction by hash</div>
                 <div class="method">eth_getTransactionReceipt - Get transaction receipt</div>
                 <div class="method">eth_getLogs - Get event logs</div>
+                <div class="method">eth_requestFaucet - Request test BNB</div>
                 
                 <h2>Contract Methods</h2>
                 <div class="method">getContractInfo - Get all official contracts</div>
@@ -442,6 +452,7 @@ function handleRequest(req, res) {
             <button class="test-button" onclick="testRPC('getPumpContractInfo')">Get PUMP Contract</button>
             <button class="test-button" onclick="testEVMTransaction()">Test EVM Transaction</button>
             <button class="test-button" onclick="testEVMReceipt()">Test EVM Receipt</button>
+            <button class="test-button" onclick="testFaucet()">Test Faucet</button>
             <div id="test-result" style="margin-top: 15px;"></div>
         </div>
         
@@ -563,6 +574,37 @@ function handleRequest(req, res) {
                 resultDiv.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
             }
         }
+        
+        async function testFaucet() {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.innerHTML = '<p>Testing Faucet...</p>';
+            
+            // Use a test address
+            const testAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb';
+            
+            try {
+                const response = await fetch('https://${DOMAIN}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method: 'eth_requestFaucet',
+                        params: [testAddress]
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = '<pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef;">' + JSON.stringify(data, null, 2) + '</pre>';
+                
+                // Store the transaction hash for receipt testing
+                if (data.result && data.result.txHash) {
+                    window.lastTxHash = data.result.txHash;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #dc3545;">Error: ' + error.message + '</p>';
+            }
+        }
     </script>
 </body>
 </html>`;
@@ -677,6 +719,65 @@ function handleRequest(req, res) {
                     id: id,
                     result: logs
                 };
+                
+            } else if (method === 'eth_requestFaucet') {
+                // Faucet functionality for testnet
+                const address = params[0];
+                
+                if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        error: {
+                            code: -32602,
+                            message: "Invalid address format"
+                        }
+                    };
+                } else {
+                    // Generate a faucet transaction
+                    const txHash = generateTxHash();
+                    const amount = "1000000000000000000"; // 1 BNB in wei
+                    
+                    // Create mock transaction for faucet
+                    const faucetTx = {
+                        hash: txHash,
+                        from: '0x0000000000000000000000000000000000000000', // Faucet address
+                        to: address,
+                        value: amount,
+                        gas: '0x5208',
+                        gasPrice: '0x3b9aca00',
+                        nonce: '0x0',
+                        blockHash: currentBlockHash,
+                        blockNumber: '0x' + currentBlockNumber.toString(16),
+                        transactionIndex: '0x0'
+                    };
+                    
+                    // Create receipt
+                    const faucetReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash, '0x1');
+                    faucetReceipt.from = '0x0000000000000000000000000000000000000000';
+                    faucetReceipt.to = address;
+                    
+                    // Store transaction and receipt
+                    transactionStore.set(txHash, faucetTx);
+                    receiptStore.set(txHash, faucetReceipt);
+                    
+                    currentBlockNumber++;
+                    currentBlockHash = generateBlockHash();
+                    
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: {
+                            success: true,
+                            txHash: txHash,
+                            amount: amount,
+                            to: address,
+                            message: "1 BNB sent to " + address
+                        }
+                    };
+                    
+                    console.log(`Faucet request: Sent 1 BNB to ${address}, tx: ${txHash}`);
+                }
                 
             } else {
                 // Try to get real data from BSSC validator first
