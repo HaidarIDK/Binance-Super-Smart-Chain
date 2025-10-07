@@ -19,6 +19,7 @@ scp -r bssc-validator-deploy root@109.147.47.132:/tmp/
 
 ### 2️⃣ SSH to Server
 
+
 ```bash
 ssh root@109.147.47.132
 ```

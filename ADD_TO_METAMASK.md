@@ -15,7 +15,7 @@ Click the MetaMask extension in your browser
 ```
 Network Name: BSSC Testnet
 RPC URL: https://bssc-rpc.bssc.live
-Chain ID: 47964
+Chain ID: 97
 Currency Symbol: BNB
 Block Explorer URL: (leave blank for now)
 ```
