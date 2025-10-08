@@ -269,8 +269,10 @@ impl Opcode {
             Opcode::SLT | Opcode::SGT | Opcode::EQ | Opcode::ISZERO | 
             Opcode::AND | Opcode::OR | Opcode::XOR | Opcode::BYTE |
             Opcode::CALLDATALOAD | Opcode::MLOAD | Opcode::MSTORE | 
-            Opcode::MSTORE8 | Opcode::PUSH1..=Opcode::PUSH32 |
-            Opcode::DUP1..=Opcode::DUP16 | Opcode::SWAP1..=Opcode::SWAP16 => 3,
+            Opcode::MSTORE8 => 3,
+            op if matches!(*op as u8, 0x60..=0x7f) => 3, // PUSH1-PUSH32
+            op if matches!(*op as u8, 0x80..=0x8f) => 3, // DUP1-DUP16
+            op if matches!(*op as u8, 0x90..=0x9f) => 3, // SWAP1-SWAP16
             
             Opcode::MUL | Opcode::DIV | Opcode::SDIV | Opcode::MOD | Opcode::SMOD => 5,
             Opcode::ADDMOD | Opcode::MULMOD | Opcode::SIGNEXTEND => 8,
@@ -518,8 +520,9 @@ impl EvmInterpreter {
             Opcode::POP => {
                 self.pop()?;
             }
-            Opcode::PUSH1..=Opcode::PUSH32 => {
-                let n = (opcode as u8 - Opcode::PUSH1 as u8 + 1) as usize;
+            op if matches!(op as u8, 0x60..=0x7f) => {
+                // PUSH1-PUSH32
+                let n = (op as u8 - 0x60 + 1) as usize;
                 let mut value = [0u8; 32];
                 let end = (self.pc + n + 1).min(bytecode.len());
                 let data = &bytecode[self.pc + 1..end];
@@ -527,14 +530,16 @@ impl EvmInterpreter {
                 self.push(&value)?;
                 self.pc += n;
             }
-            Opcode::DUP1..=Opcode::DUP16 => {
-                let n = (opcode as u8 - Opcode::DUP1 as u8) as usize;
-                let value = self.stack.get(self.stack.len() - n - 1)
+            op if matches!(op as u8, 0x80..=0x8f) => {
+                // DUP1-DUP16
+                let n = (op as u8 - 0x80) as usize;
+                let value = *self.stack.get(self.stack.len() - n - 1)
                     .ok_or(ProgramError::InvalidAccountData)?;
-                self.push(value)?;
+                self.push(&value)?;
             }
-            Opcode::SWAP1..=Opcode::SWAP16 => {
-                let n = (opcode as u8 - Opcode::SWAP1 as u8 + 1) as usize;
+            op if matches!(op as u8, 0x90..=0x9f) => {
+                // SWAP1-SWAP16
+                let n = (op as u8 - 0x90 + 1) as usize;
                 let len = self.stack.len();
                 if len < n + 1 {
                     return Err(ProgramError::InvalidAccountData);
@@ -669,8 +674,9 @@ impl EvmInterpreter {
             }
 
             // Logging operations
-            Opcode::LOG0..=Opcode::LOG4 => {
-                let topic_count = (opcode as u8 - Opcode::LOG0 as u8) as usize;
+            op if matches!(op as u8, 0xa0..=0xa4) => {
+                // LOG0-LOG4
+                let topic_count = (op as u8 - 0xa0) as usize;
                 let offset = u256_to_usize(&self.pop()?);
                 let size = u256_to_usize(&self.pop()?);
                 
