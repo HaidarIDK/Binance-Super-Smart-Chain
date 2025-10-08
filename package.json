@@ -14,7 +14,9 @@
   "name": "bssc-live-rpc-server",
   "scripts": {
     "dev": "node bssc-live-server.js",
-    "start": "node bssc-live-server.js"
+    "start": "node bssc-live-server.js",
+    "explorer": "node explorer-server.js",
+    "rpc": "node bssc-live-server.js"
   },
   "dependencies": {
     "node-forge": "^1.3.1"

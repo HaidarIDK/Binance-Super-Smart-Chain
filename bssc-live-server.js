@@ -352,6 +352,33 @@ const mockResponses = {
     }
 };
 
+// Get all transactions for explorer
+function getAllTransactions() {
+    const txs = [];
+    for (const [hash, tx] of transactionStore.entries()) {
+        const receipt = receiptStore.get(hash);
+        txs.push({
+            hash: hash,
+            from: tx.from || '0x0000000000000000000000000000000000000000',
+            to: tx.to || '0x0000000000000000000000000000000000000000',
+            value: tx.value || '0x0',
+            timestamp: transactionTimestamps.get(hash) || Date.now(),
+            status: receipt?.status === '0x1' ? 'success' : 'failed',
+            gasUsed: parseInt(receipt?.gasUsed || '0x5208', 16),
+            gasPrice: tx.gasPrice || '0x4a817c800',
+            blockNumber: parseInt(receipt?.blockNumber || '0x0', 16)
+        });
+    }
+    // Sort by timestamp, newest first
+    return txs.sort((a, b) => b.timestamp - a.timestamp);
+}
+
+// Get recent transactions (limit)
+function getRecentTransactions(limit = 20) {
+    const allTxs = getAllTransactions();
+    return allTxs.slice(0, limit);
+}
+
 // Request handler
 function handleRequest(req, res) {
     // Security headers
@@ -1002,6 +1029,23 @@ function handleRequest(req, res) {
                 console.log(`BNB Airdrop: ${amount} BNB to ${address}, tx: ${txHash}`);
                 savePersistentData();
                 
+            } else if (method === 'bssc_getAllTransactions') {
+                // Get all transactions for explorer
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: getAllTransactions()
+                };
+                
+            } else if (method === 'bssc_getRecentTransactions') {
+                // Get recent transactions with limit
+                const limit = params[0] || 20;
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: getRecentTransactions(limit)
+                };
+                
             } else {
                 // Try to get real data from BSSC validator first
                 const realData = await callBSSCValidator(method, params);
@@ -1011,18 +1055,18 @@ function handleRequest(req, res) {
                     console.log(`Using real BSSC validator data for ${method}`);
                 } else if (mockResponses[method]) {
                     // Fallback to mock responses
-                    response = {...mockResponses[method]};
-                    response.id = id;
+                response = {...mockResponses[method]};
+                response.id = id;
                     console.log(`Using mock data for ${method} (validator not available)`);
-                } else {
-                    response = {
-                        jsonrpc: "2.0",
-                        id: id,
-                        error: {
-                            code: -32601,
-                            message: `Method '${method}' not found`
-                        }
-                    };
+            } else {
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    error: {
+                        code: -32601,
+                        message: `Method '${method}' not found`
+                    }
+                };
                 }
             }
             
@@ -1138,8 +1182,8 @@ const httpServer = http.createServer((req, res) => {
     // Only redirect to HTTPS if not on Render (Render handles SSL termination)
     if (process.env.RENDER && req.headers['x-forwarded-proto'] !== 'https') {
         const httpsUrl = `https://${req.headers.host}${req.url}`;
-        res.writeHead(301, {'Location': httpsUrl});
-        res.end();
+    res.writeHead(301, {'Location': httpsUrl});
+    res.end();
     } else {
         // Handle request normally on Render
         handleRequest(req, res);
@@ -1160,18 +1204,18 @@ if (process.env.RENDER) {
     });
 } else {
     // On local/server, start both HTTP and HTTPS
-    httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-        console.log(`🌐 HTTP Server running on port ${HTTP_PORT} (redirects to HTTPS)`);
-    });
+httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
+    console.log(`🌐 HTTP Server running on port ${HTTP_PORT} (redirects to HTTPS)`);
+});
 
-    httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
-        console.log(`🔒 HTTPS RPC Server running on https://${DOMAIN}`);
-        console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
-        console.log(`🌐 CORS enabled for web3 applications`);
-        console.log(`🔒 Security headers enabled`);
-        console.log(`📖 Documentation: https://${DOMAIN}/`);
-        console.log(`⏹️  Press Ctrl+C to stop`);
-    });
+httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+    console.log(`🔒 HTTPS RPC Server running on https://${DOMAIN}`);
+    console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
+    console.log(`🌐 CORS enabled for web3 applications`);
+    console.log(`🔒 Security headers enabled`);
+    console.log(`📖 Documentation: https://${DOMAIN}/`);
+    console.log(`⏹️  Press Ctrl+C to stop`);
+});
 }
 
 // Graceful shutdown

@@ -25,6 +25,10 @@ use {
     std::collections::HashMap,
 };
 
+// Include EVM interpreter module
+mod evm_interpreter;
+use evm_interpreter::{EvmInterpreter, ExecutionContext, ExecutionResult, Log};
+
 // Include gas optimization module
 mod gas_optimization;
 use gas_optimization::{
@@ -396,19 +400,41 @@ impl EvmExecutor {
         result
     }
 
-    /// Execute contract call
-    fn execute_contract_call(&mut self, address: &[u8; 20], _data: &[u8], gas_limit: u64) -> Result<Vec<u8>, ProgramError> {
+    /// Execute contract call with FULL EVM interpreter
+    fn execute_contract_call(&mut self, address: &[u8; 20], data: &[u8], gas_limit: u64) -> Result<Vec<u8>, ProgramError> {
         let code = self.state.get_code(address);
         if code.is_empty() {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        // Simple EVM execution - in a real implementation, this would be a full EVM interpreter
-        // For now, we'll implement basic functionality
-        solana_program::log::sol_log(&format!("Executing contract call to {:?}", address));
-        
-        // Return empty result for now
-        Ok(vec![])
+        // Create execution context
+        let context = ExecutionContext {
+            address: *address,
+            caller: [0u8; 20], // Would be set from transaction
+            origin: [0u8; 20],  // Would be set from transaction
+            value: 0,
+            data: data.to_vec(),
+            gas_limit,
+            gas_price: self.state.gas_price,
+            block_number: self.state.block_number,
+            timestamp: self.state.timestamp,
+            chain_id: 16979, // BSSC Chain ID
+        };
+
+        // Create interpreter and execute bytecode
+        let mut interpreter = EvmInterpreter::new(gas_limit);
+        let result = interpreter.execute(&code, &context, &mut self.state)?;
+
+        solana_program::log::sol_log(&format!(
+            "Contract executed: gas_used={}, success={}, return_data_len={}",
+            result.gas_used, result.success, result.return_data.len()
+        ));
+
+        if !result.success {
+            return Err(ProgramError::Custom(1)); // Execution reverted
+        }
+
+        Ok(result.return_data)
     }
 
     /// Execute contract deployment
