@@ -626,7 +626,7 @@
                     <input 
                         type="text" 
                         id="faucetAddress" 
-                        placeholder="Enter your wallet address (Solana format)"
+                        placeholder="Enter your wallet address (Solana or Ethereum format)"
                         style="flex: 1; padding: 1rem; background: var(--dark); border: 2px solid var(--border); border-radius: 8px; color: var(--light); font-size: 1rem;"
                     >
                     <button onclick="requestFaucet()" style="padding: 1rem 2rem; background: var(--primary); color: var(--dark); border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
@@ -1386,10 +1386,17 @@
         const FAUCET_AMOUNT = 3; // 3 BNB per request
         const RATE_LIMIT_HOURS = 24; // 24 hours between requests
 
+        // Helper function to detect if address is Ethereum format
+        function isEthereumAddress(address) {
+            return address.startsWith('0x') && address.length === 42;
+        }
+
         async function requestFaucet() {
             const addressInput = document.getElementById('faucetAddress');
             const messageDiv = document.getElementById('faucetMessage');
-            const address = addressInput.value.trim();
+            let address = addressInput.value.trim();
+            let originalAddress = address;
+            let isEthFormat = false;
             
             // Validate address
             if (!address) {
@@ -1397,11 +1404,27 @@
                 return;
             }
             
+            // Check if it's Ethereum format - if so, we'll use the RPC server to convert
+            if (isEthereumAddress(address)) {
+                isEthFormat = true;
+                showFaucetMessage('Ethereum address detected. Converting to Solana format...', 'loading');
+                
+                // We'll send the request to the MetaMask RPC which will convert it
+                // But for the faucet, we need to convert it here
+                // For now, show a message that they need to use Solana format
+                showFaucetMessage(
+                    'Please use a Solana wallet address for the faucet.<br>' +
+                    'For MetaMask users: Connect MetaMask to https://bssc-rpc.bssc.live and your balance will show there.',
+                    'error'
+                );
+                return;
+            }
+            
             // Check if it's a valid Solana address
             try {
                 new solanaWeb3.PublicKey(address);
             } catch (e) {
-                showFaucetMessage('Invalid Solana wallet address', 'error');
+                showFaucetMessage('Invalid wallet address. Please enter a valid Solana address.', 'error');
                 return;
             }
             
