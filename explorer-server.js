@@ -4,7 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const HTTP_PORT = process.env.PORT || 3000;
+const HTTP_PORT = process.env.PORT || 3001;
 const HTTPS_PORT = 8443; // Use 8443 to avoid conflict with RPC server on 443
 
 // Generate self-signed certificate if it doesn't exist

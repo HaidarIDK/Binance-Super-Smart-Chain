@@ -14,6 +14,7 @@ const {
 
 const HTTP_PORT = process.env.PORT || 80;
 const HTTPS_PORT = process.env.PORT || 443;
+const METAMASK_PORT = 8545; // Local MetaMask testing port
 const DOMAIN = 'bssc-rpc.bssc.live';
 
 // Official Contract Addresses
@@ -263,6 +264,21 @@ const mockResponses = {
         jsonrpc: "2.0",
         id: 1,
         result: "16979"
+    },
+    eth_syncing: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: false // Not syncing, blockchain is ready
+    },
+    eth_call: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: "0x" // Empty result for contract calls
+    },
+    eth_getCode: {
+        jsonrpc: "2.0",
+        id: 1,
+        result: "0x" // No code at address (EOA)
     },
     eth_getBalance: {
         jsonrpc: "2.0",
@@ -1147,6 +1163,42 @@ function handleRequest(req, res) {
                     result: []
                 };
                 
+            } else if (method === 'eth_getBlockByNumber') {
+                // Get block by number - required by MetaMask
+                const blockNumberParam = params[0];
+                const fullTx = params[1] || false;
+                
+                // Use dynamic block number like eth_blockNumber does
+                const dynamicBlockNumber = Math.floor(Date.now() / 400);
+                const blockNum = blockNumberParam === 'latest' ? '0x' + dynamicBlockNumber.toString(16) : blockNumberParam;
+                
+                // Return a mock block structure
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        number: blockNum,
+                        hash: '0x' + Math.random().toString(16).substring(2).padEnd(64, '0'),
+                        parentHash: '0x' + Math.random().toString(16).substring(2).padEnd(64, '0'),
+                        nonce: '0x0000000000000000',
+                        sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+                        logsBloom: '0x' + '0'.repeat(512),
+                        transactionsRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b47e4b2c6c6d6c6d6c6d6c6d6c6d6c6',
+                        stateRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b47e4b2c6c6d6c6d6c6d6c6d6c6d6c6',
+                        receiptsRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b47e4b2c6c6d6c6d6c6d6c6d6c6d6c6',
+                        miner: '0x0000000000000000000000000000000000000000',
+                        difficulty: '0x0',
+                        totalDifficulty: '0x0',
+                        extraData: '0x',
+                        size: '0x3e8',
+                        gasLimit: '0x1c9c380',
+                        gasUsed: '0x5208',
+                        timestamp: '0x' + Math.floor(Date.now() / 1000).toString(16),
+                        transactions: fullTx ? [] : [],
+                        uncles: []
+                    }
+                };
+                
             } else {
                 // Try to get real data from BSSC validator first
                 const realData = await callBSSCValidator(method, params);
@@ -1316,6 +1368,13 @@ httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
     console.log(`🔒 Security headers enabled`);
     console.log(`📖 Documentation: https://${DOMAIN}/`);
     console.log(`⏹️  Press Ctrl+C to stop`);
+});
+
+// MetaMask local testing server (HTTP only, no SSL issues)
+const metamaskServer = http.createServer(handleRequest);
+metamaskServer.listen(METAMASK_PORT, '127.0.0.1', () => {
+    console.log(`🦊 MetaMask Testing Server running on http://127.0.0.1:${METAMASK_PORT}`);
+    console.log(`   Use this URL in MetaMask for local testing`);
 });
 }
 
