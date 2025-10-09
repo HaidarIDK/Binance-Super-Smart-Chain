@@ -614,6 +614,29 @@
             </div>
         </div>
 
+        <!-- Faucet Section -->
+        <div class="table-container" style="margin-bottom: 2rem;">
+            <div class="table-header">
+                <h2 class="table-title">💧 Testnet Faucet</h2>
+                <span class="badge success">3 BNB/day</span>
+            </div>
+            <div style="padding: 2rem;">
+                <p style="color: var(--gray); margin-bottom: 1.5rem;">Enter your wallet address to receive testnet BNB. Limited to 3 BNB per address per 24 hours.</p>
+                <div style="display: flex; gap: 1rem; max-width: 800px;">
+                    <input 
+                        type="text" 
+                        id="faucetAddress" 
+                        placeholder="Enter your wallet address (Solana format)"
+                        style="flex: 1; padding: 1rem; background: var(--dark); border: 2px solid var(--border); border-radius: 8px; color: var(--light); font-size: 1rem;"
+                    >
+                    <button onclick="requestFaucet()" style="padding: 1rem 2rem; background: var(--primary); color: var(--dark); border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        Request BNB
+                    </button>
+                </div>
+                <div id="faucetMessage" style="margin-top: 1rem; padding: 1rem; border-radius: 8px; display: none;"></div>
+            </div>
+        </div>
+
         <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" onclick="switchTab('transactions')">📄 Transactions</button>
@@ -1356,6 +1379,96 @@
                     button.classList.remove('copied');
                 }, 2000);
             });
+        }
+
+        // Faucet functionality with rate limiting
+        const faucetRateLimit = new Map(); // Track last faucet request per address
+        const FAUCET_AMOUNT = 3; // 3 BNB per request
+        const RATE_LIMIT_HOURS = 24; // 24 hours between requests
+
+        async function requestFaucet() {
+            const addressInput = document.getElementById('faucetAddress');
+            const messageDiv = document.getElementById('faucetMessage');
+            const address = addressInput.value.trim();
+            
+            // Validate address
+            if (!address) {
+                showFaucetMessage('Please enter a wallet address', 'error');
+                return;
+            }
+            
+            // Check if it's a valid Solana address
+            try {
+                new solanaWeb3.PublicKey(address);
+            } catch (e) {
+                showFaucetMessage('Invalid Solana wallet address', 'error');
+                return;
+            }
+            
+            // Check rate limit (stored in localStorage)
+            const lastRequest = localStorage.getItem('faucet_' + address);
+            if (lastRequest) {
+                const timeSince = Date.now() - parseInt(lastRequest);
+                const hoursLeft = Math.ceil((RATE_LIMIT_HOURS * 3600000 - timeSince) / 3600000);
+                if (timeSince < RATE_LIMIT_HOURS * 3600000) {
+                    showFaucetMessage(`This address already received BNB. Please wait ${hoursLeft} more hour(s).`, 'error');
+                    return;
+                }
+            }
+            
+            // Show loading
+            showFaucetMessage('Requesting BNB from faucet...', 'loading');
+            
+            try {
+                // Request airdrop from validator
+                const pubkey = new solanaWeb3.PublicKey(address);
+                const signature = await connection.requestAirdrop(
+                    pubkey,
+                    FAUCET_AMOUNT * solanaWeb3.LAMPORTS_PER_SOL
+                );
+                
+                // Wait for confirmation
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Store rate limit
+                localStorage.setItem('faucet_' + address, Date.now().toString());
+                
+                // Show success
+                showFaucetMessage(
+                    `Success! Sent ${FAUCET_AMOUNT} BNB to your wallet.<br>Transaction: ${signature.substring(0, 20)}...`,
+                    'success'
+                );
+                
+                // Clear input
+                addressInput.value = '';
+                
+                // Reload data to show new transaction
+                setTimeout(() => loadData(), 2000);
+                
+            } catch (error) {
+                console.error('Faucet error:', error);
+                showFaucetMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function showFaucetMessage(message, type) {
+            const messageDiv = document.getElementById('faucetMessage');
+            messageDiv.style.display = 'block';
+            messageDiv.innerHTML = message;
+            
+            if (type === 'success') {
+                messageDiv.style.background = 'rgba(14, 203, 129, 0.1)';
+                messageDiv.style.border = '1px solid var(--success)';
+                messageDiv.style.color = 'var(--success)';
+            } else if (type === 'error') {
+                messageDiv.style.background = 'rgba(246, 70, 93, 0.1)';
+                messageDiv.style.border = '1px solid var(--danger)';
+                messageDiv.style.color = 'var(--danger)';
+            } else {
+                messageDiv.style.background = 'rgba(243, 186, 47, 0.1)';
+                messageDiv.style.border = '1px solid var(--primary)';
+                messageDiv.style.color = 'var(--primary)';
+            }
         }
 
         // Utility Functions
