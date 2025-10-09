@@ -743,11 +743,14 @@
                 // Get block height
                 const blockHeight = await connection.getBlockHeight();
                 
-                // Get performance samples
-                const perfSamples = await connection.getRecentPerformanceSamples(1);
-                if (perfSamples && perfSamples.length > 0) {
-                    const tps = Math.round(perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs);
-                    document.getElementById('tps').textContent = tps.toLocaleString();
+                // Get performance samples (optional - skip if element doesn't exist)
+                const tpsElement = document.getElementById('tps');
+                if (tpsElement) {
+                    const perfSamples = await connection.getRecentPerformanceSamples(1);
+                    if (perfSamples && perfSamples.length > 0) {
+                        const tps = Math.round(perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs);
+                        tpsElement.textContent = tps.toLocaleString();
+                    }
                 }
                 
                 // Update total transactions count
@@ -907,8 +910,10 @@
                         if (block) {
                             blocks.push({
                                 number: blockSlot,
+                                hash: block.blockhash || '0x' + blockSlot.toString(16).padStart(64, '0'),
                                 txCount: block.transactions.length,
                                 timestamp: block.blockTime ? block.blockTime * 1000 : Date.now(),
+                                gasUsed: block.transactions.reduce((sum, tx) => sum + (tx.meta?.fee || 0), 0),
                                 validator: 'BSSC Validator'
                             });
                         }
