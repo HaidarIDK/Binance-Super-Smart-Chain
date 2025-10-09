@@ -96,6 +96,39 @@
             50% { opacity: 0.5; }
         }
 
+        /* Loading Indicator */
+        .loading-indicator {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1.25rem;
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .loading-indicator.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         /* Search Bar */
         .search-section {
             padding: 3rem 0;
@@ -538,11 +571,17 @@
         </div>
     </header>
 
+    <!-- Loading Indicator -->
+    <div class="loading-indicator" id="loadingIndicator">
+        <div class="loading-spinner"></div>
+        <span>Updating...</span>
+    </div>
+
     <!-- Search Section -->
     <section class="search-section">
         <div class="container">
             <h1 class="search-title">Binance Super Smart Chain Explorer</h1>
-            <p class="search-subtitle">Search transactions, addresses, and blocks on BSSC</p>
+            <p class="search-subtitle">Connected to: <span style="color: #0ECB81;">http://localhost:8899</span> (Local Validator)</p>
             <div class="search-container">
                 <input 
                     type="text" 
@@ -637,81 +676,155 @@
         </div>
     </footer>
 
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
     <script>
-        // Configuration
-        const RPC_URL = window.location.hostname === 'localhost' 
-            ? 'https://127.0.0.1:443' 
-            : 'https://bssc-rpc.bssc.live';
-
-        let currentTab = 'transactions';
-        let transactions = [];
+        // Configuration - Connect to LOCAL SOLANA BLOCKCHAIN
+        const RPC_URL = 'http://localhost:8899';
+        const connection = new solanaWeb3.Connection(RPC_URL, 'confirmed');
+        
         let blocks = [];
         let addresses = [];
-
-        // RPC Call Function
-        async function rpcCall(method, params = []) {
-            try {
-                const response = await fetch(RPC_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: Date.now(),
-                        method: method,
-                        params: params
-                    })
-                });
-                const data = await response.json();
-                return data.result;
-            } catch (error) {
-                console.error('RPC Error:', error);
-                return null;
-            }
-        }
+        let transactions = [];
+        let autoRefreshInterval = null;
+        let isLoading = false;
 
         // Load Data
         async function loadData() {
-            await Promise.all([
-                loadStats(),
-                loadTransactions(),
-                loadBlocks()
-            ]);
-        }
-
-        // Load Stats
-        async function loadStats() {
-            const blockNumber = await rpcCall('eth_blockNumber');
-            if (blockNumber) {
-                document.getElementById('latestBlock').textContent = parseInt(blockNumber, 16).toLocaleString();
-            }
-
-            // Update total transactions count
-            if (transactions.length > 0) {
-                document.getElementById('totalTxs').textContent = transactions.length.toLocaleString();
-                document.getElementById('txChange').textContent = `↑ ${transactions.length} total`;
-            }
-        }
-
-        // Load Transactions
-        async function loadTransactions() {
-            // Fetch real transactions from BSSC RPC
-            const txData = await rpcCall('bssc_getRecentTransactions', [20]);
+            if (isLoading) return;
+            isLoading = true;
             
-            if (txData && txData.length > 0) {
-                // Use real data from RPC
-                transactions = txData.map(tx => ({
-                    hash: tx.hash,
-                    from: tx.from,
-                    to: tx.to,
-                    value: (parseInt(tx.value, 16) / 1e18).toFixed(4), // Convert wei to BNB
-                    timestamp: tx.timestamp,
-                    status: tx.status,
-                    gasUsed: tx.gasUsed,
-                    blockNumber: tx.blockNumber
-                }));
-            } else {
-                // Fallback to mock data if no real transactions
-                transactions = generateMockTransactions(20);
+            // Show loading indicator
+            const indicator = document.getElementById('loadingIndicator');
+            if (indicator) indicator.classList.add('active');
+            
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadTransactions(),
+                    loadBlocks()
+                ]);
+            } catch (error) {
+                console.error('Error loading data:', error);
+            } finally {
+                isLoading = false;
+                // Hide loading indicator
+                if (indicator) {
+                    setTimeout(() => {
+                        indicator.classList.remove('active');
+                    }, 500);
+                }
+            }
+        }
+
+        // Auto-refresh data every 10 seconds
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            autoRefreshInterval = setInterval(() => {
+                loadData();
+            }, 10000); // Refresh every 10 seconds
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        // Load Stats from REAL BLOCKCHAIN
+        async function loadStats() {
+            try {
+                // Get current slot (block number)
+                const slot = await connection.getSlot();
+                document.getElementById('latestBlock').textContent = slot.toLocaleString();
+                
+                // Get block height
+                const blockHeight = await connection.getBlockHeight();
+                
+                // Get performance samples
+                const perfSamples = await connection.getRecentPerformanceSamples(1);
+                if (perfSamples && perfSamples.length > 0) {
+                    const tps = Math.round(perfSamples[0].numTransactions / perfSamples[0].samplePeriodSecs);
+                    document.getElementById('tps').textContent = tps.toLocaleString();
+                }
+                
+                // Update total transactions count
+                if (transactions.length > 0) {
+                    document.getElementById('totalTxs').textContent = transactions.length.toLocaleString();
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load Transactions from REAL BLOCKCHAIN
+        async function loadTransactions() {
+            try {
+                // Get recent signatures from the blockchain (using updated API)
+                const signatures = await connection.getSignaturesForAddress(
+                    solanaWeb3.SystemProgram.programId,
+                    { limit: 20 }
+                );
+                
+                // Fetch full transaction details
+                const txPromises = signatures.map(async (sig) => {
+                    try {
+                        const tx = await connection.getTransaction(sig.signature, {
+                            maxSupportedTransactionVersion: 0
+                        });
+                        if (tx && tx.meta) {
+                            // Calculate the value transferred (difference in balances)
+                            const preBalances = tx.meta.preBalances;
+                            const postBalances = tx.meta.postBalances;
+                            let value = 0;
+                            
+                            // Better value calculation
+                            if (preBalances.length > 1 && postBalances.length > 1) {
+                                const sent = preBalances[0] - postBalances[0] - tx.meta.fee;
+                                if (sent > 0) {
+                                    value = sent / solanaWeb3.LAMPORTS_PER_SOL;
+                                }
+                            }
+                            
+                            return {
+                                hash: sig.signature,
+                                from: tx.transaction.message.accountKeys[0].toString(),
+                                fromShort: tx.transaction.message.accountKeys[0].toString().substring(0, 8) + '...',
+                                to: tx.transaction.message.accountKeys[1] ? tx.transaction.message.accountKeys[1].toString() : 'System',
+                                toShort: tx.transaction.message.accountKeys[1] ? tx.transaction.message.accountKeys[1].toString().substring(0, 8) + '...' : 'System',
+                                value: value.toFixed(4),
+                                timestamp: sig.blockTime ? sig.blockTime * 1000 : Date.now(),
+                                status: sig.err ? 'failed' : 'success',
+                                gasUsed: tx.meta.fee,
+                                blockNumber: sig.slot
+                            };
+                        }
+                    } catch (e) {
+                        console.log('Error fetching transaction details:', e.message);
+                        // If we can't get full details, return basic info
+                        return {
+                            hash: sig.signature,
+                            from: 'Unknown',
+                            fromShort: 'Unknown',
+                            to: 'Unknown',
+                            toShort: 'Unknown',
+                            value: '0.00',
+                            timestamp: sig.blockTime ? sig.blockTime * 1000 : Date.now(),
+                            status: sig.err ? 'failed' : 'success',
+                            gasUsed: 5000,
+                            blockNumber: sig.slot
+                        };
+                    }
+                });
+                
+                transactions = (await Promise.all(txPromises)).filter(tx => tx !== undefined);
+                
+                console.log('Loaded', transactions.length, 'real transactions from blockchain');
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                transactions = [];
             }
             
             renderTransactions();
@@ -766,8 +879,8 @@
                         ${transactions.map(tx => `
                             <tr onclick="showTransactionDetails('${tx.hash}')">
                                 <td><span class="hash">${truncateHash(tx.hash)}</span></td>
-                                <td><span class="hash">${truncateHash(tx.from)}</span></td>
-                                <td><span class="hash">${truncateHash(tx.to)}</span></td>
+                                <td><span class="hash">${tx.fromShort || truncateHash(tx.from)}</span></td>
+                                <td><span class="hash">${tx.toShort || truncateHash(tx.to)}</span></td>
                                 <td>${tx.value} BNB</td>
                                 <td>${getTimeAgo(tx.timestamp)}</td>
                                 <td><span class="badge ${tx.status}">${tx.status}</span></td>
@@ -778,9 +891,38 @@
             `;
         }
 
-        // Load Blocks
+        // Load Blocks from REAL BLOCKCHAIN
         async function loadBlocks() {
-            blocks = generateMockBlocks(15);
+            try {
+                const slot = await connection.getSlot();
+                blocks = [];
+                
+                // Get last 15 blocks
+                for (let i = 0; i < 15; i++) {
+                    const blockSlot = slot - i;
+                    if (blockSlot < 0) break;
+                    
+                    try {
+                        const block = await connection.getBlock(blockSlot);
+                        if (block) {
+                            blocks.push({
+                                number: blockSlot,
+                                txCount: block.transactions.length,
+                                timestamp: block.blockTime ? block.blockTime * 1000 : Date.now(),
+                                validator: 'BSSC Validator'
+                            });
+                        }
+                    } catch (e) {
+                        // Block might not exist, skip
+                    }
+                }
+                
+                console.log('Loaded', blocks.length, 'real blocks from blockchain');
+            } catch (error) {
+                console.error('Error loading blocks:', error);
+                blocks = generateMockBlocks(15);
+            }
+            
             renderBlocks();
         }
 
@@ -903,39 +1045,98 @@
             const query = document.getElementById('searchInput').value.trim();
             if (!query) return;
 
-            if (query.startsWith('0x') && query.length === 66) {
-                // Transaction hash
+            // Check if it's a Solana address (32-44 characters, base58)
+            if (query.length >= 32 && query.length <= 44 && !query.startsWith('0x')) {
+                // Solana wallet address
+                await showWalletDetails(query);
+            } else if (query.length === 87 || query.length === 88) {
+                // Solana transaction signature
+                showTransactionDetails(query);
+            } else if (query.startsWith('0x') && query.length === 66) {
+                // Ethereum-style transaction hash
                 showTransactionDetails(query);
             } else if (query.startsWith('0x') && query.length === 42) {
-                // Address
+                // Ethereum-style address
                 showAddressDetails(query);
             } else if (!isNaN(query)) {
                 // Block number
                 showBlockDetails(parseInt(query));
             } else {
-                alert('Invalid search query. Please enter a valid address, transaction hash, or block number.');
+                alert('Invalid search query. Please enter a valid wallet address, transaction signature, or block number.');
             }
         }
 
         // Show Transaction Details
-        function showTransactionDetails(hash) {
-            const tx = transactions.find(t => t.hash === hash) || {
-                hash: hash,
-                from: '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-                to: '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-                value: '1.5',
-                timestamp: Date.now(),
-                status: 'success',
-                gasUsed: 21000,
-                gasPrice: '20',
-                blockNumber: 12345
-            };
+        async function showTransactionDetails(hash) {
+            // First check if we have it in our cached transactions
+            let tx = transactions.find(t => t.hash === hash);
+            
+            // If not found, try to fetch from blockchain
+            if (!tx) {
+                document.getElementById('modalTitle').textContent = 'Loading Transaction...';
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
+                        <p>Fetching transaction details from blockchain...</p>
+                    </div>
+                `;
+                document.getElementById('detailModal').classList.add('active');
+                
+                try {
+                    const txData = await connection.getTransaction(hash, {
+                        maxSupportedTransactionVersion: 0
+                    });
+                    
+                    if (txData && txData.meta) {
+                        const preBalances = txData.meta.preBalances;
+                        const postBalances = txData.meta.postBalances;
+                        let value = 0;
+                        
+                        if (preBalances.length > 1 && postBalances.length > 1) {
+                            const sent = preBalances[0] - postBalances[0] - txData.meta.fee;
+                            if (sent > 0) {
+                                value = sent / solanaWeb3.LAMPORTS_PER_SOL;
+                            }
+                        }
+                        
+                        tx = {
+                            hash: hash,
+                            from: txData.transaction.message.accountKeys[0].toString(),
+                            to: txData.transaction.message.accountKeys[1] ? txData.transaction.message.accountKeys[1].toString() : 'System Program',
+                            value: value.toFixed(4),
+                            timestamp: txData.blockTime ? txData.blockTime * 1000 : Date.now(),
+                            status: txData.meta.err ? 'failed' : 'success',
+                            gasUsed: txData.meta.fee,
+                            blockNumber: txData.slot
+                        };
+                    } else {
+                        document.getElementById('modalBody').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-icon">❌</div>
+                                <h3>Transaction Not Found</h3>
+                                <p>Could not find transaction with signature: ${hash.substring(0, 20)}...</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error fetching transaction:', error);
+                    document.getElementById('modalBody').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">❌</div>
+                            <h3>Error Loading Transaction</h3>
+                            <p>${error.message}</p>
+                        </div>
+                    `;
+                    return;
+                }
+            }
 
             document.getElementById('modalTitle').textContent = 'Transaction Details';
             document.getElementById('modalBody').innerHTML = `
                 <div class="detail-row">
-                    <div class="detail-label">Transaction Hash</div>
-                    <div class="detail-value">
+                    <div class="detail-label">Transaction Signature</div>
+                    <div class="detail-value" style="word-break: break-all;">
                         ${tx.hash}
                         <button class="copy-btn" onclick="copyToClipboard('${tx.hash}', this)">Copy</button>
                     </div>
@@ -945,23 +1146,23 @@
                     <div class="detail-value"><span class="badge ${tx.status}">${tx.status}</span></div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-label">Block</div>
-                    <div class="detail-value">${tx.blockNumber || 'Pending'}</div>
+                    <div class="detail-label">Block (Slot)</div>
+                    <div class="detail-value">${tx.blockNumber ? tx.blockNumber.toLocaleString() : 'Pending'}</div>
                 </div>
                 <div class="detail-row">
                     <div class="detail-label">Timestamp</div>
                     <div class="detail-value">${new Date(tx.timestamp).toLocaleString()}</div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-label">From</div>
-                    <div class="detail-value">
+                    <div class="detail-label">From (Sender)</div>
+                    <div class="detail-value" style="word-break: break-all;">
                         ${tx.from}
                         <button class="copy-btn" onclick="copyToClipboard('${tx.from}', this)">Copy</button>
                     </div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-label">To</div>
-                    <div class="detail-value">
+                    <div class="detail-label">To (Recipient)</div>
+                    <div class="detail-value" style="word-break: break-all;">
                         ${tx.to}
                         <button class="copy-btn" onclick="copyToClipboard('${tx.to}', this)">Copy</button>
                     </div>
@@ -971,12 +1172,8 @@
                     <div class="detail-value">${tx.value} BNB</div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-label">Gas Used</div>
-                    <div class="detail-value">${tx.gasUsed.toLocaleString()}</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Gas Price</div>
-                    <div class="detail-value">${tx.gasPrice || '20'} Gwei</div>
+                    <div class="detail-label">Transaction Fee</div>
+                    <div class="detail-value">${(tx.gasUsed / solanaWeb3.LAMPORTS_PER_SOL).toFixed(6)} BNB (${tx.gasUsed.toLocaleString()} lamports)</div>
                 </div>
             `;
             document.getElementById('detailModal').classList.add('active');
@@ -1030,6 +1227,81 @@
         }
 
         // Show Address Details
+        // Show Wallet Details (Real Solana Wallet)
+        async function showWalletDetails(address) {
+            try {
+                document.getElementById('modalTitle').textContent = 'Loading Wallet...';
+                document.getElementById('modalBody').innerHTML = '<div style="text-align: center; padding: 40px;">Loading wallet information...</div>';
+                document.getElementById('detailModal').classList.add('active');
+                
+                // Create PublicKey from address string
+                const pubkey = new solanaWeb3.PublicKey(address);
+                
+                // Get balance
+                const balance = await connection.getBalance(pubkey);
+                const balanceBNB = balance / solanaWeb3.LAMPORTS_PER_SOL;
+                
+                // Get transaction signatures for this address
+                const signatures = await connection.getConfirmedSignaturesForAddress2(pubkey, { limit: 50 });
+                const txCount = signatures.length;
+                
+                // Get recent transactions
+                let recentTxsHtml = '';
+                if (signatures.length > 0) {
+                    const recentSigs = signatures.slice(0, 10);
+                    recentTxsHtml = '<div style="margin-top: 20px;"><h3>Recent Transactions:</h3>';
+                    for (const sig of recentSigs) {
+                        recentTxsHtml += `
+                            <div style="background: #0B0E11; padding: 10px; margin: 5px 0; border-radius: 8px; font-family: monospace; font-size: 0.85em;">
+                                <div>${sig.signature.substring(0, 20)}...${sig.signature.substring(sig.signature.length - 20)}</div>
+                                <div style="color: #848E9C; font-size: 0.9em;">
+                                    Slot: ${sig.slot} | ${new Date(sig.blockTime * 1000).toLocaleString()} | 
+                                    <span style="color: ${sig.err ? '#F6465D' : '#0ECB81'}">${sig.err ? 'Failed' : 'Success'}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    recentTxsHtml += '</div>';
+                }
+                
+                document.getElementById('modalTitle').textContent = 'Wallet Details';
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Wallet Address</div>
+                        <div class="detail-value" style="word-break: break-all;">
+                            ${address}
+                            <button class="copy-btn" onclick="copyToClipboard('${address}', this)">Copy</button>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Balance</div>
+                        <div class="detail-value" style="color: #F3BA2F; font-size: 1.5em; font-weight: bold;">
+                            ${balanceBNB.toFixed(4)} BNB
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Balance (Lamports)</div>
+                        <div class="detail-value">${balance.toLocaleString()}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Transaction Count</div>
+                        <div class="detail-value">${txCount.toLocaleString()}</div>
+                    </div>
+                    ${recentTxsHtml}
+                `;
+            } catch (error) {
+                console.error('Error loading wallet details:', error);
+                document.getElementById('modalTitle').textContent = 'Error';
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #F6465D;">
+                        <h3>Error Loading Wallet</h3>
+                        <p>${error.message}</p>
+                        <p style="color: #848E9C; margin-top: 10px;">Please check that the address is valid.</p>
+                    </div>
+                `;
+            }
+        }
+        
         function showAddressDetails(address) {
             const addr = addresses.find(a => a.address === address) || {
                 address: address,
@@ -1109,13 +1381,10 @@
 
         // Initialize
         loadData();
+        startAutoRefresh();
 
-        // Auto-refresh every 30 seconds
-        setInterval(() => {
-            loadStats();
-            if (currentTab === 'transactions') loadTransactions();
-            else if (currentTab === 'blocks') loadBlocks();
-        }, 30000);
+        console.log('%c🚀 BSSC Explorer Loaded', 'color: #F3BA2F; font-size: 16px; font-weight: bold;');
+        console.log('%cAuto-refresh enabled: Every 10 seconds', 'color: #0ECB81;');
     </script>
 </body>
 </html>
