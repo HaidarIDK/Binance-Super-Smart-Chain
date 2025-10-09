@@ -3,6 +3,15 @@ const https = require('https');
 const http = require('http');
 const fs = require('fs');
 
+// Import Ethereum-Solana address bridge
+const {
+    ethAddressToSolanaAddress,
+    solanaAddressToEthAddress,
+    isEthereumAddress,
+    isSolanaAddress,
+    normalizeAddress
+} = require('./eth-solana-bridge.js');
+
 const HTTP_PORT = process.env.PORT || 80;
 const HTTPS_PORT = process.env.PORT || 443;
 const DOMAIN = 'bssc-rpc.bssc.live';
@@ -801,7 +810,15 @@ function handleRequest(req, res) {
                 
             } else if (method === 'eth_getTransactionCount') {
                 // Get transaction count (nonce) for address
-                const address = params[0];
+                let address = params[0];
+                
+                // Convert Ethereum address to Solana if needed
+                if (isEthereumAddress(address)) {
+                    const solanaAddr = ethAddressToSolanaAddress(address);
+                    console.log(`Converted ETH address ${address} to Solana ${solanaAddr} for nonce query`);
+                    address = solanaAddr;
+                }
+                
                 const nonce = addressNonces.get(address) || 0;
                 
                 response = {
@@ -809,6 +826,61 @@ function handleRequest(req, res) {
                     id: id,
                     result: '0x' + nonce.toString(16)
                 };
+                
+            } else if (method === 'eth_sendTransaction') {
+                // Handle MetaMask transaction sending
+                const txParams = params[0];
+                let fromAddress = txParams.from;
+                let toAddress = txParams.to;
+                
+                // Convert Ethereum addresses to Solana
+                if (isEthereumAddress(fromAddress)) {
+                    const solanaFrom = ethAddressToSolanaAddress(fromAddress);
+                    console.log(`Converted sender ${fromAddress} to ${solanaFrom}`);
+                    fromAddress = solanaFrom;
+                }
+                
+                if (toAddress && isEthereumAddress(toAddress)) {
+                    const solanaTo = ethAddressToSolanaAddress(toAddress);
+                    console.log(`Converted recipient ${toAddress} to ${solanaTo}`);
+                    toAddress = solanaTo;
+                }
+                
+                // Create transaction on Solana blockchain
+                const txHash = generateTxHash();
+                const mockTx = {
+                    hash: txHash,
+                    from: fromAddress,
+                    to: toAddress,
+                    value: txParams.value || '0x0',
+                    gas: txParams.gas || '0x5208',
+                    gasPrice: txParams.gasPrice || '0x4a817c800',
+                    nonce: '0x' + (addressNonces.get(fromAddress) || 0).toString(16),
+                    blockHash: currentBlockHash,
+                    blockNumber: '0x' + currentBlockNumber.toString(16),
+                    transactionIndex: '0x0'
+                };
+                
+                const mockReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash);
+                mockReceipt.from = fromAddress;
+                mockReceipt.to = toAddress;
+                
+                transactionStore.set(txHash, mockTx);
+                receiptStore.set(txHash, mockReceipt);
+                transactionTimestamps.set(txHash, Date.now());
+                addressNonces.set(fromAddress, (addressNonces.get(fromAddress) || 0) + 1);
+                
+                currentBlockNumber++;
+                currentBlockHash = generateBlockHash();
+                
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: txHash
+                };
+                
+                console.log(`MetaMask transaction: ${fromAddress} -> ${toAddress}, tx: ${txHash}`);
+                savePersistentData();
                 
             } else if (method === 'eth_getTransactionByHash') {
                 const txHash = params[0];
@@ -1044,6 +1116,35 @@ function handleRequest(req, res) {
                     jsonrpc: "2.0",
                     id: id,
                     result: getRecentTransactions(limit)
+                };
+                
+            } else if (method === 'eth_getBalance') {
+                // Get balance for Ethereum or Solana address
+                let address = params[0];
+                
+                // Convert Ethereum address to Solana if needed
+                if (isEthereumAddress(address)) {
+                    const solanaAddr = ethAddressToSolanaAddress(address);
+                    console.log(`Converted ETH address ${address} to Solana ${solanaAddr}`);
+                    address = solanaAddr;
+                }
+                
+                // Query balance from validator or use mock
+                // For now, return mock balance
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: "0x1bc16d674ec80000" // 2 BNB in hex
+                };
+                
+                console.log(`eth_getBalance for ${address}: 2 BNB`);
+                
+            } else if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
+                // Return empty array - MetaMask will use its own accounts
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: []
                 };
                 
             } else {
