@@ -691,7 +691,7 @@ function handleRequest(req, res) {
                             blockHash: currentBlockHash,
                             blockNumber: '0x' + currentBlockNumber.toString(16),
                             transactionIndex: '0x0'
-                    };
+                        };
                     
                     // Create receipt
                     const faucetReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash, '0x1');
@@ -717,8 +717,9 @@ function handleRequest(req, res) {
                         }
                     };
                     
-                    console.log(`Faucet request: Sent 1 BNB to ${address}, tx: ${txHash}`);
+                    console.log(`Faucet request: Sent 3 BNB to ${address}, tx: ${txHash}`);
                     savePersistentData();
+                    }
                 }
                 
             } else if (method === 'getBNBBalance') {
