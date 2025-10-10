@@ -1050,7 +1050,18 @@ const httpServer = http.createServer((req, res) => {
 const httpsServer = https.createServer(serverOptions, handleRequest);
 
 // Start server based on environment
-if (process.env.RENDER) {
+// Check if running behind Nginx (METAMASK_PORT env var set by systemd)
+if (process.env.METAMASK_PORT) {
+    // Running on server behind Nginx - only start on port 8545
+    const serverPort = parseInt(process.env.METAMASK_PORT);
+    const server = http.createServer(handleRequest);
+    server.listen(serverPort, '127.0.0.1', () => {
+        console.log(`🌐 BSSC RPC Server running on port ${serverPort} (behind Nginx)`);
+        console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
+        console.log(`🌐 CORS enabled via Nginx`);
+        console.log(`🔒 Public URL: https://bssc-rpc.bssc.live`);
+    });
+} else if (process.env.RENDER) {
     // On Render, only start HTTP server (Render handles SSL termination)
     httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
         console.log(`🌐 RPC Server running on port ${HTTP_PORT} (Render)`);
@@ -1073,12 +1084,12 @@ httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
     console.log(`⏹️  Press Ctrl+C to stop`);
 });
 
-// MetaMask local testing server (HTTP only, no SSL issues)
-const metamaskServer = http.createServer(handleRequest);
-metamaskServer.listen(METAMASK_PORT, '127.0.0.1', () => {
-    console.log(`🦊 MetaMask Testing Server running on http://127.0.0.1:${METAMASK_PORT}`);
-    console.log(`   Use this URL in MetaMask for local testing`);
-});
+    // MetaMask local testing server (HTTP only, no SSL issues)
+    const metamaskServer = http.createServer(handleRequest);
+    metamaskServer.listen(METAMASK_PORT, '127.0.0.1', () => {
+        console.log(`🦊 MetaMask Testing Server running on http://127.0.0.1:${METAMASK_PORT}`);
+        console.log(`   Use this URL in MetaMask for local testing`);
+    });
 }
 
 // Graceful shutdown
