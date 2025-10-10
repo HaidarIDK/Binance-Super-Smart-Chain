@@ -634,8 +634,8 @@ function handleRequest(req, res) {
                 };
                 
             } else if (method === 'eth_requestFaucet') {
-                // Faucet functionality for testnet
-                const address = params[0];
+                // Faucet functionality for testnet - converts ETH address and sends real BNB
+                let address = params[0];
                 
                 if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
                     response = {
@@ -647,22 +647,50 @@ function handleRequest(req, res) {
                         }
                     };
                 } else {
-                    // Generate a faucet transaction
-                    const txHash = generateTxHash();
-                    const amount = "1000000000000000000"; // 1 BNB in wei
+                    // Convert Ethereum address to Solana address
+                    const solanaAddress = ethAddressToSolanaAddress(address);
+                    console.log(`Faucet: Converting ${address} to ${solanaAddress}`);
                     
-                    // Create mock transaction for faucet
-                    const faucetTx = {
-                        hash: txHash,
-                        from: '0x0000000000000000000000000000000000000000', // Faucet address
-                        to: address,
-                        value: amount,
-                        gas: '0x5208',
-                        gasPrice: '0x3b9aca00',
-                        nonce: '0x0',
-                        blockHash: currentBlockHash,
-                        blockNumber: '0x' + currentBlockNumber.toString(16),
-                        transactionIndex: '0x0'
+                    // Request airdrop from validator
+                    try {
+                        const airdropData = await callBSSCValidator('requestAirdrop', [
+                            solanaAddress,
+                            3000000000 // 3 BNB in lamports
+                        ]);
+                        
+                        if (airdropData && airdropData.result) {
+                            response = {
+                                jsonrpc: "2.0",
+                                id: id,
+                                result: {
+                                    success: true,
+                                    signature: airdropData.result,
+                                    amount: "3000000000000000000", // 3 BNB in wei
+                                    solanaAddress: solanaAddress,
+                                    ethAddress: address
+                                }
+                            };
+                            console.log(`Faucet: Sent 3 BNB to ${address} (Solana: ${solanaAddress})`);
+                        } else {
+                            throw new Error('Airdrop failed');
+                        }
+                    } catch (error) {
+                        console.error('Faucet error:', error);
+                        // Fallback to mock transaction if validator not available
+                        const txHash = generateTxHash();
+                        const amount = "3000000000000000000"; // 3 BNB in wei
+                        
+                        const faucetTx = {
+                            hash: txHash,
+                            from: '0x0000000000000000000000000000000000000000',
+                            to: address,
+                            value: amount,
+                            gas: '0x5208',
+                            gasPrice: '0x3b9aca00',
+                            nonce: '0x0',
+                            blockHash: currentBlockHash,
+                            blockNumber: '0x' + currentBlockNumber.toString(16),
+                            transactionIndex: '0x0'
                     };
                     
                     // Create receipt

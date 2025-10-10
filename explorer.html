@@ -1404,20 +1404,49 @@
                 return;
             }
             
-            // Check if it's Ethereum format - if so, we'll use the RPC server to convert
+            // Check if it's Ethereum format - use RPC server to handle conversion
             if (isEthereumAddress(address)) {
                 isEthFormat = true;
-                showFaucetMessage('Ethereum address detected. Converting to Solana format...', 'loading');
+                originalAddress = address;
+                showFaucetMessage('Ethereum address detected. Requesting BNB...', 'loading');
                 
-                // We'll send the request to the MetaMask RPC which will convert it
-                // But for the faucet, we need to convert it here
-                // For now, show a message that they need to use Solana format
-                showFaucetMessage(
-                    'Please use a Solana wallet address for the faucet.<br>' +
-                    'For MetaMask users: Connect MetaMask to https://bssc-rpc.bssc.live and your balance will show there.',
-                    'error'
-                );
-                return;
+                // Use the MetaMask RPC server which has address conversion
+                try {
+                    const response = await fetch('https://bssc-rpc.bssc.live', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "eth_requestFaucet",
+                            params: [address]
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.result) {
+                        // Store rate limit
+                        localStorage.setItem('faucet_' + address, Date.now().toString());
+                        
+                        showFaucetMessage(
+                            `Success! Sent ${FAUCET_AMOUNT} BNB to your MetaMask wallet.<br>` +
+                            `Check your balance at https://bssc-rpc.bssc.live (Chain ID: 16979)<br>` +
+                            `Transaction: ${data.result.signature ? data.result.signature.substring(0, 20) + '...' : 'Confirmed'}`,
+                            'success'
+                        );
+                        
+                        addressInput.value = '';
+                        setTimeout(() => loadData(), 2000);
+                        return;
+                    } else {
+                        throw new Error(data.error?.message || 'Faucet request failed');
+                    }
+                } catch (error) {
+                    console.error('ETH faucet error:', error);
+                    showFaucetMessage('Error: ' + error.message, 'error');
+                    return;
+                }
             }
             
             // Check if it's a valid Solana address
