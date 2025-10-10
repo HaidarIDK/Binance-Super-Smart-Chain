@@ -10,8 +10,7 @@ export default function Navigation() {
   const navigation = [
     { name: 'Features', href: '#features' },
     { name: 'Performance', href: '#performance' },
-    { name: 'Architecture', href: '#architecture' },
-    { name: 'Developer Tools', href: '#developer-tools' },
+    { name: 'Live Testnet', href: '#live-testnet' },
     { name: 'Getting Started', href: '#getting-started' },
   ]
 

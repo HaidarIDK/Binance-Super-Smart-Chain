@@ -1,8 +1,7 @@
 import Hero from '@/components/Hero'
 import Features from '@/components/Features'
 import PerformanceComparison from '@/components/PerformanceComparison'
-import TechArchitecture from '@/components/TechArchitecture'
-import DeveloperTools from '@/components/DeveloperTools'
+import LiveTestnet from '@/components/LiveTestnet'
 import GettingStarted from '@/components/GettingStarted'
 import Footer from '@/components/Footer'
 import Navigation from '@/components/Navigation'
@@ -14,8 +13,7 @@ export default function Home() {
       <Hero />
       <Features />
       <PerformanceComparison />
-      <TechArchitecture />
-      <DeveloperTools />
+      <LiveTestnet />
       <GettingStarted />
       <Footer />
     </main>
