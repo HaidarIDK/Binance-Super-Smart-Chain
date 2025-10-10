@@ -840,6 +840,7 @@ function handleRequest(req, res) {
             } else if (method === 'eth_getBalance') {
                 // Get balance for Ethereum or Solana address
                 let address = params[0];
+                let originalAddress = address;
                 
                 // Convert Ethereum address to Solana if needed
                 if (isEthereumAddress(address)) {
@@ -848,15 +849,36 @@ function handleRequest(req, res) {
                     address = solanaAddr;
                 }
                 
-                // Query balance from validator or use mock
-                // For now, return mock balance
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: "0x1bc16d674ec80000" // 2 BNB in hex
-                };
-                
-                console.log(`eth_getBalance for ${address}: 2 BNB`);
+                // Query balance from validator
+                try {
+                    const balanceData = await callBSSCValidator('getBalance', [address]);
+                    
+                    if (balanceData && balanceData.result !== undefined) {
+                        // Convert lamports to wei (1 BNB = 10^18 wei = 10^9 lamports)
+                        const lamports = balanceData.result;
+                        const wei = BigInt(lamports) * BigInt(1000000000); // Convert lamports to wei
+                        const hexBalance = '0x' + wei.toString(16);
+                        
+                        response = {
+                            jsonrpc: "2.0",
+                            id: id,
+                            result: hexBalance
+                        };
+                        
+                        console.log(`eth_getBalance for ${originalAddress}: ${lamports / 1000000000} BNB (real balance from validator)`);
+                    } else {
+                        throw new Error('No balance data from validator');
+                    }
+                } catch (error) {
+                    console.log('BSSC Validator not available for balance query:', error.message);
+                    // Fallback to mock balance
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: "0x0" // 0 BNB if can't reach validator
+                    };
+                    console.log(`eth_getBalance for ${originalAddress}: 0 BNB (validator not available)`);
+                }
                 
             } else if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
                 // Return empty array - MetaMask will use its own accounts
