@@ -86,11 +86,22 @@ export default function Hero() {
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             <a
-              href="#getting-started"
+              href="https://explorer.bssc.live"
+              target="_blank"
+              rel="noopener noreferrer"
               className="btn-primary flex items-center space-x-2 group"
             >
-              <span>Start Building</span>
+              <span>🔍 Block Explorer</span>
               <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+            </a>
+            <a
+              href="https://bssc-rpc.bssc.live"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary flex items-center space-x-2"
+            >
+              <Globe size={20} />
+              <span>RPC Endpoint</span>
             </a>
             <a
               href="https://github.com/HaidarIDK/Binance-Super-Smart-Chain"
@@ -99,7 +110,7 @@ export default function Hero() {
               className="btn-secondary flex items-center space-x-2"
             >
               <Rocket size={20} />
-              <span>View on GitHub</span>
+              <span>GitHub</span>
             </a>
           </motion.div>
 

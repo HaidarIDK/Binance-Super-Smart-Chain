@@ -15,6 +15,11 @@ export default function Navigation() {
     { name: 'Getting Started', href: '#getting-started' },
   ]
 
+  const externalLinks = [
+    { name: 'Explorer', href: 'https://explorer.bssc.live', icon: ExternalLink },
+    { name: 'RPC', href: 'https://bssc-rpc.bssc.live', icon: ExternalLink },
+  ]
+
   return (
     <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -44,6 +49,18 @@ export default function Navigation() {
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center space-x-4">
+            {externalLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-1 text-gray-600 hover:text-bsc-600 transition-colors duration-200 font-medium"
+              >
+                <span>{link.name}</span>
+                <link.icon size={14} />
+              </a>
+            ))}
             <a
               href="https://github.com/HaidarIDK/Binance-Super-Smart-Chain"
               target="_blank"
@@ -85,6 +102,18 @@ export default function Navigation() {
                 </Link>
               ))}
               <div className="pt-4 space-y-2">
+                {externalLinks.map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-bsc-600 transition-colors duration-200"
+                  >
+                    <span>{link.name}</span>
+                    <link.icon size={14} />
+                  </a>
+                ))}
                 <a
                   href="https://github.com/HaidarIDK/Binance-Super-Smart-Chain"
                   target="_blank"
