@@ -1258,16 +1258,26 @@
                 </div>
                 <div class="detail-row">
                     <div class="detail-label">From (Sender)</div>
-                    <div class="detail-value" style="word-break: break-all;">
-                        ${tx.from}
-                        <button class="copy-btn" onclick="copyToClipboard('${tx.from}', this)">Copy</button>
+                    <div class="detail-value">
+                        <div style="margin-bottom:0.5rem;">
+                            <strong>ETH:</strong> ${tx.fromEth || 'N/A'}
+                        </div>
+                        <div style="word-break: break-all; color: var(--gray); font-size: 0.9em;">
+                            <strong>Solana:</strong> ${tx.from}
+                            <button class="copy-btn" onclick="copyToClipboard('${tx.from}', this)">Copy</button>
+                        </div>
                     </div>
                 </div>
                 <div class="detail-row">
                     <div class="detail-label">To (Recipient)</div>
-                    <div class="detail-value" style="word-break: break-all;">
-                        ${tx.to}
-                        <button class="copy-btn" onclick="copyToClipboard('${tx.to}', this)">Copy</button>
+                    <div class="detail-value">
+                        <div style="margin-bottom:0.5rem;">
+                            <strong>ETH:</strong> ${tx.toEth || 'N/A'}
+                        </div>
+                        <div style="word-break: break-all; color: var(--gray); font-size: 0.9em;">
+                            <strong>Solana:</strong> ${tx.to}
+                            <button class="copy-btn" onclick="copyToClipboard('${tx.to}', this)">Copy</button>
+                        </div>
                     </div>
                 </div>
                 <div class="detail-row">
@@ -1415,37 +1425,102 @@
             }
         }
         
-        function showAddressDetails(address) {
-            const addr = addresses.find(a => a.address === address) || {
-                address: address,
-                balance: '100.50',
-                txCount: 42,
-                percentage: '0.01'
-            };
-
-            document.getElementById('modalTitle').textContent = 'Address Details';
-            document.getElementById('modalBody').innerHTML = `
-                <div class="detail-row">
-                    <div class="detail-label">Address</div>
-                    <div class="detail-value">
-                        ${addr.address}
-                        <button class="copy-btn" onclick="copyToClipboard('${addr.address}', this)">Copy</button>
+        async function showAddressDetails(address) {
+            try {
+                document.getElementById('modalTitle').textContent = 'Loading Address...';
+                document.getElementById('modalBody').innerHTML = '<div style="text-align: center; padding: 40px;">Loading address information...</div>';
+                document.getElementById('detailModal').classList.add('active');
+                
+                // Check if it's an ETH address (0x...)
+                const isEthAddress = address.toLowerCase().startsWith('0x');
+                let ethAddress = isEthAddress ? address : null;
+                let solanaAddress = address;
+                
+                // If it's an ETH address, get the Solana mapping
+                if (isEthAddress) {
+                    const reverseMapping = Object.entries(addressMappings).find(([sol, eth]) => eth.toLowerCase() === address.toLowerCase());
+                    if (reverseMapping) {
+                        solanaAddress = reverseMapping[0];
+                    }
+                }
+                
+                // Get balance using eth_getBalance (works for both ETH and Solana addresses)
+                const balanceResponse = await fetch(RPC_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: Date.now(),
+                        method: 'eth_getBalance',
+                        params: [ethAddress || solanaAddress, 'latest']
+                    })
+                });
+                
+                const balanceData = await balanceResponse.json();
+                const balanceBNB = balanceData.result ? parseFloat(balanceData.result) : 0;
+                
+                // Get transaction count (approximate - using on-chain data)
+                let txCount = 0;
+                try {
+                    const pubkey = new solanaWeb3.PublicKey(solanaAddress);
+                    const signatures = await connection.getConfirmedSignaturesForAddress2(pubkey, { limit: 1000 });
+                    txCount = signatures.length;
+                } catch (e) {
+                    console.warn('Could not fetch transaction count:', e);
+                }
+                
+                // Calculate percentage (mock for now - would need total supply)
+                const totalSupply = 1000000; // Mock total supply
+                const percentage = ((balanceBNB / totalSupply) * 100).toFixed(4);
+                
+                document.getElementById('modalTitle').textContent = 'Address Details';
+                const addressHtml = ethAddress ? `
+                    <div style="margin-bottom:0.5rem;">
+                        <strong>ETH:</strong> ${ethAddress}
+                        <button class="copy-btn" onclick="copyToClipboard('${ethAddress}', this)">Copy</button>
                     </div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Balance</div>
-                    <div class="detail-value">${parseFloat(addr.balance).toLocaleString()} BSSC</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Percentage of Supply</div>
-                    <div class="detail-value">${addr.percentage}%</div>
-                </div>
-                <div class="detail-row">
-                    <div class="detail-label">Transaction Count</div>
-                    <div class="detail-value">${addr.txCount.toLocaleString()}</div>
-                </div>
-            `;
-            document.getElementById('detailModal').classList.add('active');
+                    <div style="word-break: break-all; color: var(--gray); font-size: 0.9em;">
+                        <strong>Solana:</strong> ${solanaAddress}
+                        <button class="copy-btn" onclick="copyToClipboard('${solanaAddress}', this)">Copy</button>
+                    </div>
+                ` : `
+                    ${solanaAddress}
+                    <button class="copy-btn" onclick="copyToClipboard('${solanaAddress}', this)">Copy</button>
+                `;
+                
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="detail-row">
+                        <div class="detail-label">Address</div>
+                        <div class="detail-value">
+                            ${addressHtml}
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Balance</div>
+                        <div class="detail-value" style="color: #F3BA2F; font-size: 1.5em; font-weight: bold;">
+                            ${balanceBNB.toFixed(4)} BSSC
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Percentage of Supply</div>
+                        <div class="detail-value">${percentage}%</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Transaction Count</div>
+                        <div class="detail-value">${txCount.toLocaleString()}</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading address details:', error);
+                document.getElementById('modalTitle').textContent = 'Error';
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #F6465D;">
+                        <div style="font-size: 1.5em; margin-bottom: 10px;">⚠️</div>
+                        <div>Failed to load address details</div>
+                        <div style="margin-top: 10px; font-size: 0.9em; color: #848E9C;">${error.message}</div>
+                    </div>
+                `;
+            }
         }
 
         // Close Modal
