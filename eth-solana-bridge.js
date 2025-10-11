@@ -5,8 +5,45 @@ const crypto = require('crypto');
 const fs = require('fs');
 const bs58 = require('bs58').default;
 
+// For proper keypair derivation
+let nacl;
+try {
+    nacl = require('tweetnacl');
+} catch (e) {
+    console.log('[WARNING] tweetnacl not installed - keypair features disabled');
+    console.log('   Install with: npm install tweetnacl');
+}
+
 // Address mapping storage
 const addressMappings = new Map();
+
+/**
+ * Derive a proper Solana keypair from an Ethereum address
+ * This creates a REAL keypair with both public and private keys
+ * Note: This is deterministic but the private key is derived from the ETH address hash
+ */
+function ethAddressToSolanaKeypair(ethAddress) {
+    if (!nacl) {
+        throw new Error('tweetnacl not installed. Run: npm install tweetnacl');
+    }
+    
+    // Remove 0x prefix
+    const cleanEthAddress = ethAddress.toLowerCase().replace('0x', '');
+    
+    // Create deterministic seed from ETH address (32 bytes needed for ed25519)
+    const seed = crypto.createHash('sha256')
+        .update(Buffer.from(cleanEthAddress, 'hex'))
+        .digest();
+    
+    // Generate ed25519 keypair from seed
+    const keypair = nacl.sign.keyPair.fromSeed(seed);
+    
+    return {
+        publicKey: bs58.encode(keypair.publicKey),
+        secretKey: keypair.secretKey, // Full 64-byte secret key
+        seed: seed
+    };
+}
 
 /**
  * Derive a Solana address from an Ethereum address
@@ -21,7 +58,14 @@ function ethAddressToSolanaAddress(ethAddress) {
         return addressMappings.get(cleanEthAddress);
     }
     
-    // Create deterministic Solana address from Ethereum address
+    // Try to use proper keypair derivation if available
+    if (nacl) {
+        const keypair = ethAddressToSolanaKeypair(ethAddress);
+        addressMappings.set(cleanEthAddress, keypair.publicKey);
+        return keypair.publicKey;
+    }
+    
+    // Fallback: Create deterministic Solana address from Ethereum address
     // Use SHA256 hash of the Ethereum address as seed
     const seed = crypto.createHash('sha256')
         .update(Buffer.from(cleanEthAddress, 'hex'))
@@ -117,6 +161,7 @@ setInterval(() => saveMappings(), 30000);
 
 module.exports = {
     ethAddressToSolanaAddress,
+    ethAddressToSolanaKeypair,
     solanaAddressToEthAddress,
     isEthereumAddress,
     isSolanaAddress,

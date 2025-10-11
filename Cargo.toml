@@ -67,6 +67,7 @@ members = [
     "programs/bpf_loader",
     "programs/bpf_loader/gen-syscall-list",
     "programs/bsc-evm",
+    "programs/eth-bridge",
     "programs/compute-budget",
     "programs/config",
     "programs/ed25519-tests",

@@ -1,0 +1,23 @@
+[package]
+name = "eth-bridge"
+version = "0.1.0"
+description = "Ethereum to Solana bridge using PDA for address derivation"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "eth_bridge"
+
+[dependencies]
+solana-program = { path = "../../sdk/program", version = "=2.0.0" }
+borsh = "0.10"
+thiserror = "1.0"
+
+[dev-dependencies]
+solana-program-test = { path = "../../program-test", version = "=2.0.0" }
+solana-sdk = { path = "../../sdk", version = "=2.0.0" }
+tokio = { version = "1.0", features = ["full"] }
+
+[features]
+no-entrypoint = []
+

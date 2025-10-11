@@ -109,6 +109,17 @@ function handleRequest(req, res) {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
+    // Fix CSP to allow Solana Web3.js (uses wasm and some eval for performance)
+    res.setHeader('Content-Security-Policy', 
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: https:; " +
+        "connect-src 'self' https://bssc-rpc.bssc.live https://api.mainnet-beta.solana.com http://localhost:* ws://localhost:* wss://*; " +
+        "font-src 'self' data:; " +
+        "worker-src 'self' blob:;"
+    );
+    
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
         res.end();
@@ -166,14 +177,14 @@ if (fs.existsSync('server-cert.pem') && fs.existsSync('server-key.pem')) {
     const httpsServer = https.createServer(httpsOptions, handleRequest);
     
     httpsServer.listen(HTTPS_PORT, () => {
-        console.log(`🔒 HTTPS: https://localhost:${HTTPS_PORT}`);
+        console.log(`[INFO] HTTPS: https://localhost:${HTTPS_PORT}`);
     }).on('error', (err) => {
         if (err.code === 'EACCES') {
-            console.log(`⚠️  Cannot bind to port ${HTTPS_PORT} (requires admin/sudo)`);
+            console.log(`[WARNING] Cannot bind to port ${HTTPS_PORT} (requires admin/sudo)`);
         } else if (err.code === 'EADDRINUSE') {
-            console.log(`⚠️  Port ${HTTPS_PORT} already in use (HTTPS disabled)`);
+            console.log(`[WARNING] Port ${HTTPS_PORT} already in use (HTTPS disabled)`);
         } else {
-            console.error(`⚠️  HTTPS error: ${err.message}`);
+            console.error(`[ERROR] HTTPS error: ${err.message}`);
         }
     });
 }

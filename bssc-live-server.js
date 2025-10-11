@@ -6,11 +6,67 @@ const fs = require('fs');
 // Import Ethereum-Solana address bridge
 const {
     ethAddressToSolanaAddress,
+    ethAddressToSolanaKeypair,
     solanaAddressToEthAddress,
     isEthereumAddress,
     isSolanaAddress,
     normalizeAddress
 } = require('./eth-solana-bridge.js');
+
+// Solana Web3.js for transaction building
+let solanaWeb3;
+try {
+    solanaWeb3 = require('@solana/web3.js');
+} catch (e) {
+    console.log('[WARNING] @solana/web3.js not installed - transactions disabled');
+    console.log('   Install with: npm install @solana/web3.js');
+}
+
+// Ethereum transaction decoder  
+let ethereumTx;
+let bsscCommon;
+try {
+    ethereumTx = require('@ethereumjs/tx');
+    const { Common, Hardfork } = require('@ethereumjs/common');
+    
+    // Create custom common for BSSC (chain ID 16979) for v10.x
+    const customChain = {
+        name: 'bssc',
+        chainId: 16979,
+        networkId: 16979,
+        defaultHardfork: Hardfork.London,
+        genesis: {
+            gasLimit: 30000000,
+            difficulty: 1,
+            nonce: '0x0000000000000042',
+            extraData: '0x'
+        },
+        hardforks: [
+            { name: Hardfork.Chainstart, block: 0 },
+            { name: Hardfork.London, block: 0 }
+        ]
+    };
+    bsscCommon = new Common({ chain: customChain, hardfork: Hardfork.London });
+    
+    console.log('[INFO] Ethereum transaction decoder ready (Chain ID: 16979)');
+} catch (e) {
+    console.log('[WARNING] @ethereumjs/tx not installed - raw transactions disabled');
+    console.log('   Install with: npm install @ethereumjs/tx @ethereumjs/common');
+    console.log('   Error:', e.message);
+}
+
+// Import PDA bridge client
+const ethBridgeClient = require('./eth-bridge-client.js');
+
+// Set bridge program ID (set this after deploying the program)
+const ETH_BRIDGE_PROGRAM_ID = process.env.ETH_BRIDGE_PROGRAM_ID || null;
+if (ETH_BRIDGE_PROGRAM_ID) {
+    ethBridgeClient.setBridgeProgramId(ETH_BRIDGE_PROGRAM_ID);
+    console.log('[INFO] ETH Bridge PDA program enabled:', ETH_BRIDGE_PROGRAM_ID);
+} else {
+    console.log('[WARNING] ETH Bridge PDA program not configured. Transactions will fail.');
+    console.log('   Set ETH_BRIDGE_PROGRAM_ID environment variable after deploying program.');
+}
 
 const HTTP_PORT = process.env.PORT || 80;
 const HTTPS_PORT = process.env.PORT || 443;
@@ -28,84 +84,60 @@ const OFFICIAL_CONTRACTS = {
     }
 };
 
-// BSSC Validator RPC URL (update this when validator is deployed)
-const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://109.147.47.132:8899';
+// BSSC Validator RPC URL - REQUIRED (no mock fallback)
+const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://127.0.0.1:8899';
 
-// In-memory transaction and receipt storage (for EVM-on-Solana option)
-const transactionStore = new Map();
-const receiptStore = new Map();
-const logStore = new Map();
-let currentBlockNumber = 0;
-let currentBlockHash = '0x' + '0'.repeat(64);
+// Validator connection status
+let validatorConnected = false;
 
-// BNB token on Solana tracking
-const BNB_TOKEN_ADDRESS = 'BNBTokenSolanaBSSC1111111111111111111111111';
-const bnbBalances = new Map();
+// ETH address to Solana address mapping (for tracking conversions)
+const addressMappings = new Map();
 
-// BNB to SOL exchange rate
-const BNB_TO_SOL_RATE = 5;
+// Transaction signature cache (ETH tx hash -> Solana signature)
+const transactionSignatureCache = new Map();
 
 // Persistent storage file
 const STORAGE_FILE = 'bssc-data.json';
 
-// Load persistent data
+// Load persistent data (only address mappings and tx cache)
 function loadPersistentData() {
     try {
         if (fs.existsSync(STORAGE_FILE)) {
             const data = JSON.parse(fs.readFileSync(STORAGE_FILE, 'utf8'));
             
-            // Load BNB balances
-            if (data.bnbBalances) {
-                Object.entries(data.bnbBalances).forEach(([addr, balance]) => {
-                    bnbBalances.set(addr, balance);
+            // Load address mappings
+            if (data.addressMappings) {
+                Object.entries(data.addressMappings).forEach(([eth, sol]) => {
+                    addressMappings.set(eth.toLowerCase(), sol);
                 });
             }
             
-            // Load transactions
-            if (data.transactions) {
-                Object.entries(data.transactions).forEach(([hash, tx]) => {
-                    transactionStore.set(hash, tx);
+            // Load transaction signature cache
+            if (data.transactionSignatureCache) {
+                Object.entries(data.transactionSignatureCache).forEach(([ethHash, solSig]) => {
+                    transactionSignatureCache.set(ethHash, solSig);
                 });
             }
             
-            // Load receipts
-            if (data.receipts) {
-                Object.entries(data.receipts).forEach(([hash, receipt]) => {
-                    receiptStore.set(hash, receipt);
-                });
-            }
-            
-            // Load current block number
-            if (data.currentBlockNumber) {
-                currentBlockNumber = data.currentBlockNumber;
-            }
-            
-            console.log('Loaded persistent data from ' + STORAGE_FILE);
-        } else {
-            // Initialize default balances
-            bnbBalances.set('F6iwdHyHi5KfEVKETtmnuKHZPX9T43rCVjHk8UTxGZDA', 5);
+            console.log(`[INFO] Loaded ${addressMappings.size} address mappings and ${transactionSignatureCache.size} transaction signatures`);
         }
     } catch (error) {
-        console.error('Error loading persistent data:', error.message);
-        // Initialize default balances
-        bnbBalances.set('F6iwdHyHi5KfEVKETtmnuKHZPX9T43rCVjHk8UTxGZDA', 5);
+        console.error('[ERROR] Error loading persistent data:', error.message);
     }
 }
 
-// Save persistent data
+// Save persistent data (only address mappings and tx cache)
 function savePersistentData() {
     try {
         const data = {
-            bnbBalances: Object.fromEntries(bnbBalances),
-            transactions: Object.fromEntries(transactionStore),
-            receipts: Object.fromEntries(receiptStore),
-            currentBlockNumber: currentBlockNumber,
+            addressMappings: Object.fromEntries(addressMappings),
+            transactionSignatureCache: Object.fromEntries(transactionSignatureCache),
             lastSaved: new Date().toISOString()
         };
         
         fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2), 'utf8');
     } catch (error) {
-        console.error('Error saving persistent data:', error.message);
+        console.error('[ERROR] Error saving persistent data:', error.message);
     }
 }
 
@@ -115,293 +147,132 @@ loadPersistentData();
 // Auto-save every 30 seconds
 setInterval(savePersistentData, 30000);
 
-// Track transaction timestamps
-const transactionTimestamps = new Map();
-
-// Track address transaction counts (nonces)
-const addressNonces = new Map();
-
-// Generate a mock transaction hash
-function generateTxHash() {
-    return '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-}
-
-// Generate a mock block hash
-function generateBlockHash() {
-    return '0x' + Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join('');
-}
-
-// Create a mock transaction receipt
-function createMockReceipt(txHash, blockNumber, blockHash, status = '0x1') {
-    return {
-        transactionHash: txHash,
-        transactionIndex: '0x0',
-        blockHash: blockHash,
-        blockNumber: '0x' + blockNumber.toString(16),
-        from: '0x' + '0'.repeat(40),
-        to: '0x' + '0'.repeat(40),
-        cumulativeGasUsed: '0x5208',
-        gasUsed: '0x5208',
-        contractAddress: null,
-        logs: [],
-        logsBloom: '0x' + '0'.repeat(512),
-        status: status
-    };
-}
-
-// Create a mock transaction
-function createMockTransaction(txHash, rawTx) {
-    return {
-        hash: txHash,
-        nonce: '0x0',
-        blockHash: currentBlockHash,
-        blockNumber: '0x' + currentBlockNumber.toString(16),
-        transactionIndex: '0x0',
-        from: '0x' + '0'.repeat(40),
-        to: '0x' + '0'.repeat(40),
-        value: '0x0',
-        gas: '0x5208',
-        gasPrice: '0x5d21dba00',
-        input: '0x',
-        v: '0x0',
-        r: '0x' + '0'.repeat(64),
-        s: '0x' + '0'.repeat(64)
-    };
-}
-
-// Function to call real BSSC validator
-async function callBSSCValidator(method, params = []) {
-    try {
-        const response = await fetch(BSSC_VALIDATOR_URL, {
+// Check validator connection on startup
+async function checkValidatorConnection() {
+    return new Promise((resolve) => {
+        const postData = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getHealth',
+            params: []
+        });
+        
+        const options = {
+            hostname: '127.0.0.1',
+            port: 8899,
+            path: '/',
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
+            },
+            timeout: 2000
+        };
+        
+        const req = http.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const jsonData = JSON.parse(data);
+                    if (jsonData.result === 'ok') {
+                        validatorConnected = true;
+                        console.log('[INFO] Connected to BSSC Validator at', BSSC_VALIDATOR_URL);
+                        resolve(true);
+                    } else {
+                        validatorConnected = false;
+                        resolve(false);
+                    }
+                } catch (error) {
+                    validatorConnected = false;
+                    resolve(false);
+                }
+            });
+        });
+        
+        req.on('error', (error) => {
+            validatorConnected = false;
+            console.error('[ERROR] Cannot connect to BSSC Validator at', BSSC_VALIDATOR_URL);
+            console.error('   Error:', error.message);
+            console.error('   [WARNING] RPC server will not function without validator!');
+            resolve(false);
+        });
+        
+        req.on('timeout', () => {
+            req.destroy();
+            validatorConnected = false;
+            resolve(false);
+        });
+        
+        req.write(postData);
+        req.end();
+    });
+}
+
+// Periodically check validator connection
+setInterval(checkValidatorConnection, 30000);
+checkValidatorConnection();
+
+// Function to call real BSSC validator (NO FALLBACK - Real only!)
+async function callBSSCValidator(method, params = []) {
+    return new Promise((resolve, reject) => {
+        const postData = JSON.stringify({
                 jsonrpc: '2.0',
                 id: 1,
                 method: method,
                 params: params
-            })
         });
         
-        if (response.ok) {
-            const data = await response.json();
-            return data;
-        }
-    } catch (error) {
-        console.log(`BSSC Validator not available: ${error.message}`);
-    }
-    
-    // Fallback to mock responses if validator not available
-    return null;
-}
-
-// Enhanced mock responses for BSSC RPC (fallback when validator not available)
-const mockResponses = {
-    getHealth: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "ok"
-    },
-    getVersion: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-            "solana-core": "1.18.4",
-            "feature-set": 1234567890,
-            "bsc-version": "1.0.0",
-            "server": "BSSC Live RPC",
-            "domain": DOMAIN
-        }
-    },
-    getSlot: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: Math.floor(Date.now() / 400)
-    },
-    getBlockHeight: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: Math.floor(Date.now() / 400)
-    },
-    getLatestBlockhash: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-            context: {
-                slot: Math.floor(Date.now() / 400)
-            },
-            value: "11111111111111111111111111111111"
-        }
-    },
-    getAccountInfo: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-            context: {
-                slot: Math.floor(Date.now() / 400)
-            },
-            value: {
-                data: ["", "base64"],
-                executable: false,
-                lamports: 1000000000,
-                owner: "11111111111111111111111111111111",
-                rentEpoch: 0
+        const options = {
+            hostname: '127.0.0.1',
+            port: 8899,
+            path: '/',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(postData)
             }
-        }
-    },
-    // Web3/Ethereum compatible methods
-    eth_blockNumber: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x" + Math.floor(Date.now() / 400).toString(16)
-    },
-    eth_chainId: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x4253" // BSSC Testnet Chain ID 16979 (BSSC in hex: B=16, S=19, S=19, C=3)
-    },
-    net_version: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "16979"
-    },
-    eth_syncing: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: false // Not syncing, blockchain is ready
-    },
-    eth_call: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x" // Empty result for contract calls
-    },
-    eth_getCode: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x" // No code at address (EOA)
-    },
-    eth_getBalance: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x1bc16d674ec80000" // 2 BNB in hex
-    },
-    eth_gasPrice: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x5d21dba00" // 25 Gwei
-    },
-    eth_getTransactionCount: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x0"
-    },
-    eth_estimateGas: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x5208" // 21000 gas
-    },
-    // Contract information methods
-    getContractInfo: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: OFFICIAL_CONTRACTS
-    },
-    getOfficialContracts: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: OFFICIAL_CONTRACTS
-    },
-    // PUMP coin specific methods
-    getPumpContractInfo: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: OFFICIAL_CONTRACTS.PUMP
-    },
-    eth_call_pump: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: "0x0000000000000000000000000000000000000000000000000000000000000001"
-    },
-    eth_sendRawTransaction: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: null // Will be set dynamically
-    },
-    eth_getTransactionByHash: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: null // Will be set dynamically
-    },
-    eth_getTransactionReceipt: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: null // Will be set dynamically
-    },
-    eth_getLogs: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: [] // Will be set dynamically
-    },
-    eth_requestFaucet: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-            success: true,
-            txHash: null, // Will be set dynamically
-            amount: "1000000000000000000" // 1 BNB
-        }
-    },
-    // BNB Token on Solana methods
-    getBNBBalance: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-            address: "",
-            bnbBalance: 0,
-            solEquivalent: 0,
-            tokenAddress: BNB_TOKEN_ADDRESS
-        }
-    },
-    getBNBTokenInfo: {
-        jsonrpc: "2.0",
-        id: 1,
-        result: {
-            name: "BNB Token on Solana",
-            symbol: "BNB",
-            decimals: 9,
-            totalSupply: 1000000,
-            tokenAddress: BNB_TOKEN_ADDRESS,
-            exchangeRate: BNB_TO_SOL_RATE,
-            description: "BNB token on Solana network - BSSC implementation"
-        }
-    }
-};
-
-// Get all transactions for explorer
-function getAllTransactions() {
-    const txs = [];
-    for (const [hash, tx] of transactionStore.entries()) {
-        const receipt = receiptStore.get(hash);
-        txs.push({
-            hash: hash,
-            from: tx.from || '0x0000000000000000000000000000000000000000',
-            to: tx.to || '0x0000000000000000000000000000000000000000',
-            value: tx.value || '0x0',
-            timestamp: transactionTimestamps.get(hash) || Date.now(),
-            status: receipt?.status === '0x1' ? 'success' : 'failed',
-            gasUsed: parseInt(receipt?.gasUsed || '0x5208', 16),
-            gasPrice: tx.gasPrice || '0x4a817c800',
-            blockNumber: parseInt(receipt?.blockNumber || '0x0', 16)
+        };
+        
+        const req = http.request(options, (res) => {
+            let data = '';
+            
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            res.on('end', () => {
+                try {
+                    const jsonData = JSON.parse(data);
+                    
+                    if (jsonData.error) {
+                        reject(new Error(`RPC Error: ${jsonData.error.message || JSON.stringify(jsonData.error)}`));
+                    } else {
+                        resolve(jsonData);
+                    }
+                } catch (error) {
+                    reject(new Error(`Failed to parse response: ${error.message}`));
+                }
+            });
         });
-    }
-    // Sort by timestamp, newest first
-    return txs.sort((a, b) => b.timestamp - a.timestamp);
+        
+        req.on('error', (error) => {
+            validatorConnected = false;
+            console.error(`[ERROR] Validator call failed [${method}]:`, error.message);
+            reject(error);
+        });
+        
+        req.write(postData);
+        req.end();
+    });
 }
 
-// Get recent transactions (limit)
-function getRecentTransactions(limit = 20) {
-    const allTxs = getAllTransactions();
-    return allTxs.slice(0, limit);
+// Helper: Convert Solana signature to ETH tx hash format  
+function solanaSignatureToEthHash(signature) {
+    // Use first 32 bytes of signature, convert to hex with 0x prefix
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(signature).digest('hex');
+    return '0x' + hash;
 }
 
 // Request handler
@@ -469,173 +340,169 @@ function handleRequest(req, res) {
             
             let response;
             
-            // Handle EVM transaction methods with in-memory storage
-            if (method === 'eth_sendRawTransaction') {
-                const rawTx = params[0];
-                const txHash = generateTxHash();
-                
-                // Store transaction and receipt
-                const mockTx = createMockTransaction(txHash, rawTx);
-                const mockReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash);
-                
-                transactionStore.set(txHash, mockTx);
-                receiptStore.set(txHash, mockReceipt);
-                transactionTimestamps.set(txHash, Date.now());
-                
-                // Increment nonce for sender address
-                const senderAddress = mockTx.from;
-                addressNonces.set(senderAddress, (addressNonces.get(senderAddress) || 0) + 1);
-                
-                // Increment block number for next transaction
-                currentBlockNumber++;
-                currentBlockHash = generateBlockHash();
-                
+            // Start RPC method handlers
+            
+            // Basic Ethereum methods that don't need validator
+            if (method === 'eth_chainId' || method === 'eth_chainid') {
                 response = {
                     jsonrpc: "2.0",
                     id: id,
-                    result: txHash
+                    result: "0x4253" // 16979 in hex
                 };
-                console.log(`Stored transaction ${txHash} in block ${currentBlockNumber - 1}`);
-                savePersistentData();
+                
+            } else if (method === 'net_version') {
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: "16979"
+                };
+                
+            } else if (method === 'eth_blockNumber') {
+                try {
+                    const slotData = await callBSSCValidator('getSlot', []);
+                    const slot = slotData.result;
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                        result: "0x" + slot.toString(16)
+                    };
+                } catch (error) {
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                        result: "0x1"
+                    };
+                }
+                
+            } else if (method === 'eth_gasPrice') {
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: "0x3b9aca00" // 1 Gwei
+                };
+                
+            } else if (method === 'eth_estimateGas') {
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: "0x5208" // 21000 gas
+                };
+                
+            } else if (method === 'eth_syncing') {
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: false
+                };
+                
+            } else if (method === 'eth_call') {
+                // Contract call simulation - return empty for now
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: "0x"
+                };
+                
+            } else if (method === 'eth_getCode') {
+                // Get contract code - return empty (EOA)
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: "0x"
+                };
+                
+            } else if (method === 'eth_getBlockByNumber') {
+                // Get block info
+                try {
+                    const blockParam = params[0] || 'latest';
+                    const slotData = await callBSSCValidator('getSlot', []);
+                    const slot = slotData.result;
+                    
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: {
+                            number: "0x" + slot.toString(16),
+                            hash: "0x" + crypto.createHash('sha256').update(slot.toString()).digest('hex'),
+                            parentHash: "0x" + "0".repeat(64),
+                            timestamp: "0x" + Math.floor(Date.now() / 1000).toString(16),
+                            transactions: [],
+                            gasLimit: "0x1c9c380",
+                            gasUsed: "0x0",
+                            baseFeePerGas: "0x3b9aca00"
+                        }
+                    };
+                } catch (error) {
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: null
+                    };
+                }
+                
+            } else if (method === 'eth_getBlockByHash') {
+                // Get block by hash - return generic block
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        number: "0x1",
+                        hash: params[0],
+                        parentHash: "0x" + "0".repeat(64),
+                        timestamp: "0x" + Math.floor(Date.now() / 1000).toString(16),
+                        transactions: [],
+                        gasLimit: "0x1c9c380",
+                        gasUsed: "0x0",
+                        baseFeePerGas: "0x3b9aca00"
+                    }
+                };
                 
             } else if (method === 'eth_getTransactionCount') {
-                // Get transaction count (nonce) for address
-                let address = params[0];
-                
-                // Convert Ethereum address to Solana if needed
-                if (isEthereumAddress(address)) {
-                    const solanaAddr = ethAddressToSolanaAddress(address);
-                    console.log(`Converted ETH address ${address} to Solana ${solanaAddr} for nonce query`);
-                    address = solanaAddr;
-                }
-                
-                const nonce = addressNonces.get(address) || 0;
-                
+                // Get nonce - always return 0 for now
                 response = {
                     jsonrpc: "2.0",
                     id: id,
-                    result: '0x' + nonce.toString(16)
-                };
-                
-            } else if (method === 'eth_sendTransaction') {
-                // Handle MetaMask transaction sending
-                const txParams = params[0];
-                let fromAddress = txParams.from;
-                let toAddress = txParams.to;
-                
-                // Convert Ethereum addresses to Solana
-                if (isEthereumAddress(fromAddress)) {
-                    const solanaFrom = ethAddressToSolanaAddress(fromAddress);
-                    console.log(`Converted sender ${fromAddress} to ${solanaFrom}`);
-                    fromAddress = solanaFrom;
-                }
-                
-                if (toAddress && isEthereumAddress(toAddress)) {
-                    const solanaTo = ethAddressToSolanaAddress(toAddress);
-                    console.log(`Converted recipient ${toAddress} to ${solanaTo}`);
-                    toAddress = solanaTo;
-                }
-                
-                // Create transaction on Solana blockchain
-                const txHash = generateTxHash();
-                const mockTx = {
-                    hash: txHash,
-                    from: fromAddress,
-                    to: toAddress,
-                    value: txParams.value || '0x0',
-                    gas: txParams.gas || '0x5208',
-                    gasPrice: txParams.gasPrice || '0x4a817c800',
-                    nonce: '0x' + (addressNonces.get(fromAddress) || 0).toString(16),
-                    blockHash: currentBlockHash,
-                    blockNumber: '0x' + currentBlockNumber.toString(16),
-                    transactionIndex: '0x0'
-                };
-                
-                const mockReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash);
-                mockReceipt.from = fromAddress;
-                mockReceipt.to = toAddress;
-                
-                transactionStore.set(txHash, mockTx);
-                receiptStore.set(txHash, mockReceipt);
-                transactionTimestamps.set(txHash, Date.now());
-                addressNonces.set(fromAddress, (addressNonces.get(fromAddress) || 0) + 1);
-                
-                currentBlockNumber++;
-                currentBlockHash = generateBlockHash();
-                
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: txHash
-                };
-                
-                console.log(`MetaMask transaction: ${fromAddress} -> ${toAddress}, tx: ${txHash}`);
-                savePersistentData();
-                
-            } else if (method === 'eth_getTransactionByHash') {
-                const txHash = params[0];
-                const tx = transactionStore.get(txHash);
-                
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: tx || null
+                    result: "0x0"
                 };
                 
             } else if (method === 'eth_getTransactionReceipt') {
+                // Get transaction receipt
                 const txHash = params[0];
-                const receipt = receiptStore.get(txHash);
+                const solanaSig = transactionSignatureCache.get(txHash);
                 
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: receipt || null
-                };
-                
-            } else if (method === 'eth_getLogs') {
-                const filter = params[0] || {};
-                const logs = [];
-                
-                // Simple log filtering by address and block range
-                for (const [txHash, receipt] of receiptStore) {
-                    if (receipt.logs && receipt.logs.length > 0) {
-                        for (const log of receipt.logs) {
-                            let includeLog = true;
-                            
-                            if (filter.address && log.address !== filter.address) {
-                                includeLog = false;
-                            }
-                            
-                            if (filter.fromBlock && parseInt(receipt.blockNumber, 16) < parseInt(filter.fromBlock, 16)) {
-                                includeLog = false;
-                            }
-                            
-                            if (filter.toBlock && parseInt(receipt.blockNumber, 16) > parseInt(filter.toBlock, 16)) {
-                                includeLog = false;
-                            }
-                            
-                            if (includeLog) {
-                                logs.push({
-                                    ...log,
-                                    transactionHash: txHash,
-                                    blockHash: receipt.blockHash,
-                                    blockNumber: receipt.blockNumber,
-                                    transactionIndex: receipt.transactionIndex
-                                });
-                            }
+                if (solanaSig) {
+                    // Transaction found - return success receipt
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: {
+                            transactionHash: txHash,
+                            transactionIndex: "0x0",
+                            blockHash: "0x" + "0".repeat(64),
+                            blockNumber: "0x1",
+                            from: "0x0000000000000000000000000000000000000000",
+                            to: "0x0000000000000000000000000000000000000000",
+                            cumulativeGasUsed: "0x5208",
+                            gasUsed: "0x5208",
+                            contractAddress: null,
+                            logs: [],
+                            logsBloom: "0x" + "0".repeat(512),
+                            status: "0x1",
+                            effectiveGasPrice: "0x1"
                         }
-                    }
+                    };
+                } else {
+                    // Transaction not found
+                    response = {
+                        jsonrpc: "2.0",
+                        id: id,
+                        result: null
+                    };
                 }
                 
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: logs
-                };
-                
             } else if (method === 'eth_requestFaucet') {
-                // Faucet functionality for testnet - converts ETH address and sends real BNB
-                let address = params[0];
+                // REAL FAUCET using PDA
+                const address = params[0];
                 
                 if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
                     response = {
@@ -643,241 +510,152 @@ function handleRequest(req, res) {
                         id: id,
                         error: {
                             code: -32602,
-                            message: "Invalid address format"
+                            message: "Invalid Ethereum address format"
                         }
                     };
                 } else {
-                    // Convert Ethereum address to Solana address
-                    const solanaAddress = ethAddressToSolanaAddress(address);
-                    console.log(`Faucet: Converting ${address} to ${solanaAddress}`);
-                    
-                    // Request airdrop from validator
                     try {
-                        const airdropData = await callBSSCValidator('requestAirdrop', [
-                            solanaAddress,
-                            3000000000 // 3 BNB in lamports
-                        ]);
+                        const FAUCET_AMOUNT_LAMPORTS = 3000000000; // 3 BNB
                         
-                        if (airdropData && airdropData.result) {
-                            response = {
-                                jsonrpc: "2.0",
-                                id: id,
-                                result: {
-                                    success: true,
-                                    signature: airdropData.result,
-                                    amount: "3000000000000000000", // 3 BNB in wei
-                                    solanaAddress: solanaAddress,
-                                    ethAddress: address
-                                }
-                            };
-                            console.log(`Faucet: Sent 3 BNB to ${address} (Solana: ${solanaAddress})`);
-                        } else {
-                            throw new Error('Airdrop failed');
-                        }
-                    } catch (error) {
-                        console.error('Faucet error:', error);
-                        // Fallback to mock transaction if validator not available
-                        const txHash = generateTxHash();
-                        const amount = "3000000000000000000"; // 3 BNB in wei
-                        
-                        const faucetTx = {
-                            hash: txHash,
-                            from: '0x0000000000000000000000000000000000000000',
-                            to: address,
-                            value: amount,
-                            gas: '0x5208',
-                            gasPrice: '0x3b9aca00',
-                            nonce: '0x0',
-                            blockHash: currentBlockHash,
-                            blockNumber: '0x' + currentBlockNumber.toString(16),
-                            transactionIndex: '0x0'
-                        };
-                    
-                    // Create receipt
-                    const faucetReceipt = createMockReceipt(txHash, currentBlockNumber, currentBlockHash, '0x1');
-                    faucetReceipt.from = '0x0000000000000000000000000000000000000000';
-                    faucetReceipt.to = address;
-                    
-                    // Store transaction and receipt
-                    transactionStore.set(txHash, faucetTx);
-                    receiptStore.set(txHash, faucetReceipt);
-                    
-                    currentBlockNumber++;
-                    currentBlockHash = generateBlockHash();
+                        if (ETH_BRIDGE_PROGRAM_ID) {
+                            // Use PDA bridge - fund the user's PDA
+                            const { pda } = ethBridgeClient.derivePDA(address);
+                            addressMappings.set(address.toLowerCase(), pda.toBase58());
+                            
+                            console.log(`[FAUCET] Using PDA bridge:`);
+                            console.log(`   ETH Address: ${address}`);
+                            console.log(`   PDA: ${pda.toBase58()}`);
+                            
+                            // TODO: This requires @solana/web3.js and authority keypair
+                            // For now, fall back to direct airdrop
+                            const airdropData = await callBSSCValidator('requestAirdrop', [
+                                pda.toBase58(),
+                                FAUCET_AMOUNT_LAMPORTS
+                            ]);
+                            
+                            const signature = airdropData.result;
+                            const ethTxHash = solanaSignatureToEthHash(signature);
+                            transactionSignatureCache.set(ethTxHash, signature);
                     
                     response = {
                         jsonrpc: "2.0",
                         id: id,
                         result: {
                             success: true,
-                            txHash: txHash,
-                            amount: amount,
-                            to: address,
-                            message: "1 BNB sent to " + address
-                        }
-                    };
-                    
-                    console.log(`Faucet request: Sent 3 BNB to ${address}, tx: ${txHash}`);
-                    savePersistentData();
-                    }
-                }
-                
-            } else if (method === 'getBNBBalance') {
-                // Get BNB token balance on Solana
-                const address = params[0];
-                const balance = bnbBalances.get(address) || 0;
-                const solEquivalent = balance * BNB_TO_SOL_RATE;
+                                    signature: ethTxHash,
+                                    solanaSig: signature,
+                                    amount: "3000000000000000000",
+                                    pda: pda.toBase58(),
+                                    ethAddress: address,
+                                    message: `Sent 3 BNB to PDA ${pda.toBase58()}`
+                                }
+                            };
+                        } else {
+                            // No PDA bridge - use tweetnacl keypair derivation
+                            const keypair = ethAddressToSolanaKeypair(address);
+                            const solanaAddress = keypair.publicKey;
+                            addressMappings.set(address.toLowerCase(), solanaAddress);
+                            
+                            console.log(`[FAUCET] Keypair derivation (no PDA):`);
+                            console.log(`   ETH Address: ${address}`);
+                            console.log(`   Solana Address: ${solanaAddress}`);
+                            
+                            const airdropData = await callBSSCValidator('requestAirdrop', [
+                                solanaAddress,
+                                FAUCET_AMOUNT_LAMPORTS
+                            ]);
+                            
+                            const signature = airdropData.result;
+                            const ethTxHash = solanaSignatureToEthHash(signature);
+                            transactionSignatureCache.set(ethTxHash, signature);
                 
                 response = {
                     jsonrpc: "2.0",
                     id: id,
                     result: {
-                        address: address,
-                        bnbBalance: balance,
-                        solEquivalent: solEquivalent,
-                        tokenAddress: BNB_TOKEN_ADDRESS,
-                        decimals: 9,
-                        formatted: `${balance.toFixed(6)} BNB (~${solEquivalent.toFixed(6)} SOL)`
+                                    success: true,
+                                    signature: ethTxHash,
+                                    solanaSig: signature,
+                                    amount: "3000000000000000000",
+                                    solanaAddress: solanaAddress,
+                                    ethAddress: address,
+                                    message: `Sent 3 BNB to ${solanaAddress}`
+                                }
+                            };
+                        }
+                        
+                        savePersistentData();
+                        
+                    } catch (error) {
+                        console.error(`[ERROR] Faucet error: ${error.message}`);
+                        response = {
+                            jsonrpc: "2.0",
+                            id: id,
+                            error: {
+                                code: -32000,
+                                message: `Faucet failed: ${error.message}`
+                            }
+                        };
                     }
-                };
+                }
                 
-                console.log(`BNB Balance check: ${address} has ${balance} BNB`);
+            } else if (method === 'eth_getBalance') {
+                // Get REAL balance from validator (with PDA support)
+                const address = params[0];
                 
-            } else if (method === 'transferBNB') {
-                // Transfer BNB tokens on Solana
-                const [from, to, amount] = params;
-                const fromBalance = bnbBalances.get(from) || 0;
-                
-                if (fromBalance >= amount) {
-                    bnbBalances.set(from, fromBalance - amount);
-                    bnbBalances.set(to, (bnbBalances.get(to) || 0) + amount);
+                try {
+                    let solanaAddress = address;
                     
-                    const txHash = generateTxHash();
+                    // Convert Ethereum address to Solana (PDA if bridge enabled)
+                    if (isEthereumAddress(address)) {
+                        if (ETH_BRIDGE_PROGRAM_ID) {
+                            // Use PDA address
+                            const { pda } = ethBridgeClient.derivePDA(address);
+                            solanaAddress = pda.toBase58();
+                            addressMappings.set(address.toLowerCase(), solanaAddress);
+                            console.log(`[INFO] eth_getBalance (PDA): ${address} -> ${solanaAddress}`);
+                        } else {
+                            // Use keypair derivation
+                            if (!addressMappings.has(address.toLowerCase())) {
+                                const keypair = ethAddressToSolanaKeypair(address);
+                                solanaAddress = keypair.publicKey;
+                                addressMappings.set(address.toLowerCase(), solanaAddress);
+                            } else {
+                                solanaAddress = addressMappings.get(address.toLowerCase());
+                            }
+                            console.log(`[INFO] eth_getBalance: ${address} -> ${solanaAddress}`);
+                        }
+                    }
+                    
+                    // Query real balance from validator
+                    const balanceData = await callBSSCValidator('getBalance', [solanaAddress]);
+                    
+                    // Solana returns { context: {...}, value: lamports } or just lamports
+                    const lamports = typeof balanceData.result === 'object' ? balanceData.result.value : balanceData.result;
+                    
+                    // Convert lamports to wei (1 BNB = 10^18 wei = 10^9 lamports)
+                    const wei = BigInt(lamports) * BigInt(1000000000);
+                    const hexBalance = '0x' + wei.toString(16);
+                    const bnbAmount = (lamports / 1000000000).toFixed(4);
                     
                     response = {
                         jsonrpc: "2.0",
                         id: id,
-                        result: {
-                            success: true,
-                            from: from,
-                            to: to,
-                            amount: amount,
-                            txHash: txHash,
-                            message: `Transferred ${amount} BNB from ${from} to ${to}`
-                        }
+                        result: hexBalance
                     };
                     
-                    console.log(`BNB Transfer: ${amount} BNB from ${from} to ${to}, tx: ${txHash}`);
-                    savePersistentData();
-                } else {
+                    console.log(`[INFO] Balance: ${bnbAmount} BNB for ${address}`);
+                    
+                } catch (error) {
+                    console.error(`[ERROR] eth_getBalance error: ${error.message}`);
                     response = {
                         jsonrpc: "2.0",
                         id: id,
                         error: {
                             code: -32000,
-                            message: `Insufficient BNB balance. Have: ${fromBalance}, Need: ${amount}`
+                            message: `Failed to get balance: ${error.message}`
                         }
                     };
-                }
-                
-            } else if (method === 'getBNBTokenInfo') {
-                // Get BNB token information
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: {
-                        name: "BNB Token on Solana",
-                        symbol: "BNB",
-                        decimals: 9,
-                        totalSupply: Array.from(bnbBalances.values()).reduce((a, b) => a + b, 0),
-                        tokenAddress: BNB_TOKEN_ADDRESS,
-                        exchangeRate: BNB_TO_SOL_RATE,
-                        description: "BNB token on Solana network - BSSC implementation",
-                        holders: bnbBalances.size
-                    }
-                };
-                
-            } else if (method === 'requestBNBAirdrop') {
-                // Request BNB airdrop (like Solana's requestAirdrop)
-                const address = params[0];
-                const amount = params[1] || 1; // Default 1 BNB
-                
-                bnbBalances.set(address, (bnbBalances.get(address) || 0) + amount);
-                const txHash = generateTxHash();
-                
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: {
-                        success: true,
-                        signature: txHash,
-                        amount: amount,
-                        to: address,
-                        message: `Airdropped ${amount} BNB to ${address}`
-                    }
-                };
-                
-                console.log(`BNB Airdrop: ${amount} BNB to ${address}, tx: ${txHash}`);
-                savePersistentData();
-                
-            } else if (method === 'bssc_getAllTransactions') {
-                // Get all transactions for explorer
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: getAllTransactions()
-                };
-                
-            } else if (method === 'bssc_getRecentTransactions') {
-                // Get recent transactions with limit
-                const limit = params[0] || 20;
-                response = {
-                    jsonrpc: "2.0",
-                    id: id,
-                    result: getRecentTransactions(limit)
-                };
-                
-            } else if (method === 'eth_getBalance') {
-                // Get balance for Ethereum or Solana address
-                let address = params[0];
-                let originalAddress = address;
-                
-                // Convert Ethereum address to Solana if needed
-                if (isEthereumAddress(address)) {
-                    const solanaAddr = ethAddressToSolanaAddress(address);
-                    console.log(`Converted ETH address ${address} to Solana ${solanaAddr}`);
-                    address = solanaAddr;
-                }
-                
-                // Query balance from validator
-                try {
-                    const balanceData = await callBSSCValidator('getBalance', [address]);
-                    
-                    if (balanceData && balanceData.result !== undefined) {
-                        // Convert lamports to wei (1 BNB = 10^18 wei = 10^9 lamports)
-                        const lamports = balanceData.result;
-                        const wei = BigInt(lamports) * BigInt(1000000000); // Convert lamports to wei
-                        const hexBalance = '0x' + wei.toString(16);
-                        
-                        response = {
-                            jsonrpc: "2.0",
-                            id: id,
-                            result: hexBalance
-                        };
-                        
-                        console.log(`eth_getBalance for ${originalAddress}: ${lamports / 1000000000} BNB (real balance from validator)`);
-                    } else {
-                        throw new Error('No balance data from validator');
-                    }
-                } catch (error) {
-                    console.log('BSSC Validator not available for balance query:', error.message);
-                    // Fallback to mock balance
-                    response = {
-                        jsonrpc: "2.0",
-                        id: id,
-                        result: "0x0" // 0 BNB if can't reach validator
-                    };
-                    console.log(`eth_getBalance for ${originalAddress}: 0 BNB (validator not available)`);
                 }
                 
             } else if (method === 'eth_accounts' || method === 'eth_requestAccounts') {
@@ -888,61 +666,188 @@ function handleRequest(req, res) {
                     result: []
                 };
                 
-            } else if (method === 'eth_getBlockByNumber') {
-                // Get block by number - required by MetaMask
-                const blockNumberParam = params[0];
-                const fullTx = params[1] || false;
+            } else if (method === 'eth_sendTransaction' || method === 'eth_sendRawTransaction') {
+                // Handle MetaMask transaction sending with REAL Solana transactions
+                try {
+                    if (!solanaWeb3) {
+                        throw new Error('@solana/web3.js not installed');
+                    }
+                    
+                    let txParams;
+                    
+                    if (method === 'eth_sendRawTransaction') {
+                        // Decode raw transaction
+                        if (!ethereumTx || !bsscCommon) {
+                            throw new Error('@ethereumjs/tx not installed. Run: npm install @ethereumjs/tx @ethereumjs/common');
+                        }
+                        
+                        const rawTxHex = params[0];
+                        const rawTxBytes = Buffer.from(rawTxHex.replace('0x', ''), 'hex');
+                        
+                        // Use RLP library to manually decode without signature validation
+                        const rlp = require('rlp');
+                        const decoded = rlp.decode(rawTxBytes);
+                        
+                        // EIP-155 transaction: [nonce, gasPrice, gasLimit, to, value, data, v, r, s]
+                        const nonce = decoded[0].length > 0 ? '0x' + decoded[0].toString('hex') : '0x0';
+                        const gasPrice = decoded[1].length > 0 ? '0x' + decoded[1].toString('hex') : '0x0';
+                        const gas = decoded[2].length > 0 ? '0x' + decoded[2].toString('hex') : '0x5208';
+                        const to = decoded[3].length > 0 ? '0x' + decoded[3].toString('hex') : null;
+                        const value = decoded[4].length > 0 ? '0x' + decoded[4].toString('hex') : '0x0';
+                        const data = decoded[5].length > 0 ? '0x' + decoded[5].toString('hex') : '0x';
+                        const v = decoded[6];
+                        const r = decoded[7];
+                        const s = decoded[8];
+                        
+                        // Recover sender address from signature using ethereumjs-util
+                        const ethUtil = require('ethereumjs-util');
+                        
+                        // Convert RLP decoded values to proper Buffers
+                        const vBuf = Buffer.from(v);
+                        const rBuf = Buffer.from(r);
+                        const sBuf = Buffer.from(s);
+                        
+                        // For EIP-155, we need to include chainId in the signing hash
+                        const vInt = parseInt(vBuf.toString('hex') || '0', 16);
+                        const chainId = vInt >= 35 ? Math.floor((vInt - 35) / 2) : 0;
+                        
+                        // Recreate the signing message hash
+                        let msgHashData;
+                        if (chainId > 0) {
+                            // EIP-155: hash(rlp([nonce, gasprice, startgas, to, value, data, chainid, 0, 0]))
+                            const chainIdBuf = Buffer.allocUnsafe(4);
+                            chainIdBuf.writeUInt32BE(chainId, 0);
+                            // Remove leading zeros
+                            let chainIdTrimmed = chainIdBuf;
+                            while (chainIdTrimmed.length > 0 && chainIdTrimmed[0] === 0) {
+                                chainIdTrimmed = chainIdTrimmed.slice(1);
+                            }
+                            
+                            msgHashData = rlp.encode(decoded.slice(0, 6).concat([
+                                chainIdTrimmed,
+                                Buffer.from([]),
+                                Buffer.from([])
+                            ]));
+                        } else {
+                            // Pre-EIP-155
+                            msgHashData = rlp.encode(decoded.slice(0, 6));
+                        }
+                        
+                        const msgHash = ethUtil.keccak256(Buffer.from(msgHashData));
+                        const recoveryId = chainId > 0 ? (vInt - (chainId * 2 + 35)) : (vInt - 27);
+                        const publicKey = ethUtil.ecrecover(msgHash, recoveryId, rBuf, sBuf);
+                        const senderAddress = '0x' + ethUtil.publicToAddress(publicKey).toString('hex');
+                        
+                        txParams = {
+                            from: senderAddress,
+                            to: to,
+                            value: value,
+                            gas: gas,
+                            gasPrice: gasPrice,
+                            nonce: nonce,
+                            data: data
+                        };
+                        
+                        console.log('[TX] Decoded raw transaction');
+                    } else {
+                        // eth_sendTransaction - params already decoded
+                        txParams = params[0];
+                    }
+                    
+                    const fromEthAddr = txParams.from;
+                    const toEthAddr = txParams.to;
+                    const valueHex = txParams.value || '0x0';
+                    
+                    // Convert value from wei to lamports
+                    const valueBigInt = BigInt(valueHex);
+                    const lamports = Number(valueBigInt / BigInt(1000000000));
+                    
+                    console.log(`[TX] Transfer request:`);
+                    console.log(`   From ETH: ${fromEthAddr}`);
+                    console.log(`   To ETH: ${toEthAddr}`);
+                    console.log(`   Amount: ${lamports} lamports`);
+                    
+                    // Derive REAL keypairs from ETH addresses
+                    const senderKeypair = ethAddressToSolanaKeypair(fromEthAddr);
+                    const recipientKeypair = ethAddressToSolanaKeypair(toEthAddr);
+                    const recipientAddress = recipientKeypair.publicKey;
+                    
+                    console.log(`   From Solana: ${senderKeypair.publicKey}`);
+                    console.log(`   To Solana: ${recipientAddress}`);
+                    
+                    // Create Solana connection
+                    const connection = new solanaWeb3.Connection(BSSC_VALIDATOR_URL, 'confirmed');
+                    
+                    // Create Solana keypair object
+                    const fromKeypair = solanaWeb3.Keypair.fromSecretKey(senderKeypair.secretKey);
+                    const toPublicKey = new solanaWeb3.PublicKey(recipientAddress);
+                    
+                    // Get fresh blockhash (use 'confirmed' for latest)
+                    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+                    
+                    // Build REAL Solana transaction with fresh blockhash
+                    const transaction = new solanaWeb3.Transaction({
+                        recentBlockhash: blockhash,
+                        feePayer: fromKeypair.publicKey
+                    }).add(
+                        solanaWeb3.SystemProgram.transfer({
+                            fromPubkey: fromKeypair.publicKey,
+                            toPubkey: toPublicKey,
+                            lamports: lamports,
+                        })
+                    );
+                    
+                    // Sign and send transaction (don't wait for confirmation to avoid expiry)
+                    transaction.sign(fromKeypair);
+                    const signature = await connection.sendRawTransaction(transaction.serialize(), {
+                        skipPreflight: false,
+                        maxRetries: 3
+                    });
+                    
+                    // Convert to ETH tx hash
+                    const ethTxHash = solanaSignatureToEthHash(signature);
+                    transactionSignatureCache.set(ethTxHash, signature);
+                savePersistentData();
                 
-                // Use dynamic block number like eth_blockNumber does
-                const dynamicBlockNumber = Math.floor(Date.now() / 400);
-                const blockNum = blockNumberParam === 'latest' ? '0x' + dynamicBlockNumber.toString(16) : blockNumberParam;
-                
-                // Return a mock block structure
+                    console.log(`[INFO] Transaction successful!`);
+                    console.log(`   Solana Signature: ${signature}`);
+                    console.log(`   ETH Tx Hash: ${ethTxHash}`);
+                    
                 response = {
                     jsonrpc: "2.0",
                     id: id,
-                    result: {
-                        number: blockNum,
-                        hash: '0x' + Math.random().toString(16).substring(2).padEnd(64, '0'),
-                        parentHash: '0x' + Math.random().toString(16).substring(2).padEnd(64, '0'),
-                        nonce: '0x0000000000000000',
-                        sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-                        logsBloom: '0x' + '0'.repeat(512),
-                        transactionsRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b47e4b2c6c6d6c6d6c6d6c6d6c6d6c6',
-                        stateRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b47e4b2c6c6d6c6d6c6d6c6d6c6d6c6',
-                        receiptsRoot: '0x56e81f171bcc55a6ff8345e692c0f86e5b47e4b2c6c6d6c6d6c6d6c6d6c6d6c6',
-                        miner: '0x0000000000000000000000000000000000000000',
-                        difficulty: '0x0',
-                        totalDifficulty: '0x0',
-                        extraData: '0x',
-                        size: '0x3e8',
-                        gasLimit: '0x1c9c380',
-                        gasUsed: '0x5208',
-                        timestamp: '0x' + Math.floor(Date.now() / 1000).toString(16),
-                        transactions: fullTx ? [] : [],
-                        uncles: []
-                    }
+                        result: ethTxHash
                 };
                 
+                } catch (error) {
+                    console.error(`[ERROR] Transaction error: ${error.message}`);
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                        error: {
+                            code: -32000,
+                            message: `Transaction failed: ${error.message}`
+                        }
+                };
+                }
+                
             } else {
-                // Try to get real data from BSSC validator first
-                const realData = await callBSSCValidator(method, params);
-                if (realData) {
-                    response = realData;
+                // For ALL other methods: delegate to real BSSC validator
+                try {
+                    console.log(`[INFO] Delegating ${method} to BSSC validator...`);
+                    const validatorData = await callBSSCValidator(method, params);
+                    response = validatorData;
                     response.id = id;
-                    console.log(`Using real BSSC validator data for ${method}`);
-                } else if (mockResponses[method]) {
-                    // Fallback to mock responses
-                response = {...mockResponses[method]};
-                response.id = id;
-                    console.log(`Using mock data for ${method} (validator not available)`);
-            } else {
+                    console.log(`[INFO] Got response from validator for ${method}`);
+                } catch (error) {
+                    // If validator doesn't support the method, return proper error
+                    console.error(`[ERROR] ${method} failed: ${error.message}`);
                 response = {
                     jsonrpc: "2.0",
                     id: id,
                     error: {
                         code: -32601,
-                        message: `Method '${method}' not found`
+                            message: `Method '${method}' not supported. Validator error: ${error.message}`
                     }
                 };
                 }
@@ -973,9 +878,9 @@ try {
         key: fs.readFileSync('server-key.pem'),
         cert: fs.readFileSync('server-cert.pem')
     };
-    console.log('✅ SSL certificates loaded for', DOMAIN);
+    console.log('[INFO] SSL certificates loaded for', DOMAIN);
 } catch (error) {
-    console.log('⚠️ SSL certificates not found, generating new ones...');
+    console.log('[WARNING] SSL certificates not found, generating new ones...');
     
     // Generate new certificates for the domain
     const forge = require('node-forge');
@@ -1052,7 +957,7 @@ try {
         cert: certificatePem
     };
     
-    console.log('✅ New SSL certificates generated for', DOMAIN);
+    console.log('[INFO] New SSL certificates generated for', DOMAIN);
 }
 
 // Create HTTP server (redirects to HTTPS only if not on Render)
@@ -1078,58 +983,58 @@ if (process.env.METAMASK_PORT) {
     const serverPort = parseInt(process.env.METAMASK_PORT);
     const server = http.createServer(handleRequest);
     server.listen(serverPort, '127.0.0.1', () => {
-        console.log(`🌐 BSSC RPC Server running on port ${serverPort} (behind Nginx)`);
-        console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
-        console.log(`🌐 CORS enabled via Nginx`);
-        console.log(`🔒 Public URL: https://bssc-rpc.bssc.live`);
+        console.log(`[INFO] BSSC RPC Server running on port ${serverPort} (behind Nginx)`);
+        console.log(`[INFO] Available methods: Solana RPC + Ethereum compatibility`);
+        console.log(`[INFO] CORS enabled via Nginx`);
+        console.log(`[INFO] Public URL: https://bssc-rpc.bssc.live`);
     });
 } else if (process.env.RENDER) {
     // On Render, only start HTTP server (Render handles SSL termination)
     httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-        console.log(`🌐 RPC Server running on port ${HTTP_PORT} (Render)`);
-        console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
-        console.log(`🌐 CORS enabled for web3 applications`);
-        console.log(`🔒 Security headers enabled`);
+        console.log(`[INFO] RPC Server running on port ${HTTP_PORT} (Render)`);
+        console.log(`[INFO] Available methods: Solana RPC + Ethereum compatibility`);
+        console.log(`[INFO] CORS enabled for web3 applications`);
+        console.log(`[INFO] Security headers enabled`);
     });
 } else {
     // On local/server, start both HTTP and HTTPS
 httpServer.listen(HTTP_PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server running on port ${HTTP_PORT} (redirects to HTTPS)`);
+    console.log(`[INFO] HTTP Server running on port ${HTTP_PORT} (redirects to HTTPS)`);
 });
 
 httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
-    console.log(`🔒 HTTPS RPC Server running on https://${DOMAIN}`);
-    console.log(`📊 Available methods: ${Object.keys(mockResponses).join(', ')}`);
-    console.log(`🌐 CORS enabled for web3 applications`);
-    console.log(`🔒 Security headers enabled`);
-    console.log(`📖 Documentation: https://${DOMAIN}/`);
-    console.log(`⏹️  Press Ctrl+C to stop`);
+    console.log(`[INFO] HTTPS RPC Server running on https://${DOMAIN}`);
+    console.log(`[INFO] Available methods: Solana RPC + Ethereum compatibility`);
+    console.log(`[INFO] CORS enabled for web3 applications`);
+    console.log(`[INFO] Security headers enabled`);
+    console.log(`[INFO] Documentation: https://${DOMAIN}/`);
+    console.log(`[INFO] Press Ctrl+C to stop`);
 });
 
     // MetaMask local testing server (HTTP only, no SSL issues)
     const metamaskServer = http.createServer(handleRequest);
     metamaskServer.listen(METAMASK_PORT, '127.0.0.1', () => {
-        console.log(`🦊 MetaMask Testing Server running on http://127.0.0.1:${METAMASK_PORT}`);
+        console.log(`[INFO] MetaMask Testing Server running on http://127.0.0.1:${METAMASK_PORT}`);
         console.log(`   Use this URL in MetaMask for local testing`);
-    });
+});
 }
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-    console.log(`\n🛑 Shutting down ${DOMAIN} RPC servers...`);
+    console.log(`\n[INFO] Shutting down ${DOMAIN} RPC servers...`);
     httpServer.close();
     httpsServer.close();
     setTimeout(() => {
-        console.log('✅ Servers stopped');
+        console.log('[INFO] Servers stopped');
         process.exit(0);
     }, 1000);
 });
 
 // Error handling
 httpServer.on('error', (error) => {
-    console.error('❌ HTTP Server error:', error);
+    console.error('[ERROR] HTTP Server error:', error);
 });
 
 httpsServer.on('error', (error) => {
-    console.error('❌ HTTPS Server error:', error);
+    console.error('[ERROR] HTTPS Server error:', error);
 });

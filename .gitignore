@@ -77,14 +77,13 @@ wallet-quick-ref.txt
 
 # BSSC data storage (persistent RPC data)
 bssc-data.json
+address-mappings.json
 last-tx-hash.txt
 
 # Temporary test and deployment files
 test-*.html
 test-*.ps1
-test-*.js
 test-*.json
-test-*.sh
 test-*.py
 send-*.html
 send-*.ps1
@@ -92,7 +91,6 @@ send-*.js
 setup-*.html
 setup-*.ps1
 deploy-*.ps1
-deploy-*.sh
 launch*.ps1
 launch*.bat
 upload-*.ps1
@@ -103,8 +101,16 @@ connect-*.js
 view-*.html
 *-test.html
 *-viewer.html
-*-explorer.html
 *-dashboard.html
+
+# IMPORTANT: Keep these specific files (exceptions to above rules)
+!build-eth-bridge.sh
+!deploy-eth-bridge.sh
+!deploy-server.sh
+!update-server.sh
+!update-server.ps1
+!test-real-functionality.js
+!eth-bridge-client.js
 
 # Temporary documentation files
 MY_*.txt
