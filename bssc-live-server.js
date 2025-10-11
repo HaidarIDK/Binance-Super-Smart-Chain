@@ -476,7 +476,7 @@ function handleRequest(req, res) {
                         jsonrpc: "2.0",
                         id: id,
                         result: {
-                            transactionHash: txHash,
+                                    transactionHash: txHash,
                             transactionIndex: "0x0",
                             blockHash: "0x" + "0".repeat(64),
                             blockNumber: "0x1",
@@ -493,12 +493,32 @@ function handleRequest(req, res) {
                     };
                 } else {
                     // Transaction not found
-                    response = {
-                        jsonrpc: "2.0",
-                        id: id,
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
                         result: null
-                    };
+                };
                 }
+                
+            } else if (method === 'getAddressMappings') {
+                // Return all address mappings for explorer
+                const mappingsObj = {};
+                addressMappings.forEach((sol, eth) => {
+                    mappingsObj[eth] = sol;
+                });
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: mappingsObj
+                };
+                
+            } else if (method === 'getTransactionCount') {
+                // Return total transaction count
+                response = {
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: transactionSignatureCache.size
+                };
                 
             } else if (method === 'eth_requestFaucet') {
                 // REAL FAUCET using PDA
