@@ -1483,7 +1483,17 @@
                 
                 const balanceData = await balanceResponse.json();
                 console.log('Balance response:', balanceData);
-                const balanceBNB = balanceData.result ? parseFloat(balanceData.result) : 0;
+                // Parse hex balance (returns in wei/lamports as hex)
+                let balanceBNB = 0;
+                if (balanceData.result) {
+                    if (typeof balanceData.result === 'string' && balanceData.result.startsWith('0x')) {
+                        // Convert hex to decimal, then wei to BSSC
+                        const lamports = parseInt(balanceData.result, 16);
+                        balanceBNB = lamports / 1000000000; // Convert lamports to BSSC
+                    } else {
+                        balanceBNB = parseFloat(balanceData.result);
+                    }
+                }
                 
                 // If we have a valid Solana address, get the derived one from the mapping
                 if (isEthAddress && solanaAddress === null) {
