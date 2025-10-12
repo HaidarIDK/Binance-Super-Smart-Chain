@@ -1438,6 +1438,26 @@
                 let ethAddress = isEthAddress ? address : null;
                 let solanaAddress = address;
                 
+                // Fetch address mappings from RPC server
+                let addressMappings = {};
+                try {
+                    const mappingResp = await fetch(RPC_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jsonrpc: "2.0",
+                            id: 1,
+                            method: "getAddressMappings"
+                        })
+                    });
+                    const mappingData = await mappingResp.json();
+                    if (mappingData.result) {
+                        addressMappings = mappingData.result;
+                    }
+                } catch (e) {
+                    console.log('Could not load address mappings:', e.message);
+                }
+                
                 // If it's an ETH address, get the Solana mapping
                 if (isEthAddress) {
                     const reverseMapping = Object.entries(addressMappings).find(([sol, eth]) => eth.toLowerCase() === address.toLowerCase());
