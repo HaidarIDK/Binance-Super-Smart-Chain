@@ -926,17 +926,9 @@
         function renderTransactions() {
             const content = document.getElementById('transactionsContent');
             
-            if (transactions.length === 0) {
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">📭</div>
-                        <h3>No transactions yet</h3>
-                        <p>Transactions will appear here once they are processed</p>
-                    </div>
-                `;
-                return;
-            }
-
+            // Always show table, even if empty - just show loading message in rows
+            const transactionsToShow = transactions.slice(0, 10);
+            
             content.innerHTML = `
                 <table>
                     <thead>
@@ -950,7 +942,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${transactions.slice(0, 10).map(tx => `
+                        ${transactionsToShow.length === 0 ? `
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 40px; color: var(--gray);">
+                                    <div style="animation: pulse 2s ease-in-out infinite;">
+                                        <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
+                                        <div style="font-size: 1.1em; margin-bottom: 5px;">Monitoring blockchain...</div>
+                                        <div style="font-size: 0.9em;">Transactions will appear here as they are processed</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        ` : transactionsToShow.map(tx => `
                             <tr onclick="showTransactionDetails('${tx.hash}')">
                                 <td><span class="hash">${truncateHash(tx.hash)}</span></td>
                                 <td>
