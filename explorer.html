@@ -1458,11 +1458,14 @@
                     console.log('Could not load address mappings:', e.message);
                 }
                 
-                // If it's an ETH address, get the Solana mapping
+                // If it's an ETH address, get the Solana mapping from stored mappings
                 if (isEthAddress) {
                     const reverseMapping = Object.entries(addressMappings).find(([sol, eth]) => eth.toLowerCase() === address.toLowerCase());
                     if (reverseMapping) {
                         solanaAddress = reverseMapping[0];
+                    } else {
+                        // Address not in mappings yet - RPC will derive it
+                        solanaAddress = null;
                     }
                 }
                 
@@ -1474,21 +1477,49 @@
                         jsonrpc: '2.0',
                         id: Date.now(),
                         method: 'eth_getBalance',
-                        params: [ethAddress || solanaAddress, 'latest']
+                        params: [isEthAddress ? ethAddress : solanaAddress, 'latest']
                     })
                 });
                 
                 const balanceData = await balanceResponse.json();
+                console.log('Balance response:', balanceData);
                 const balanceBNB = balanceData.result ? parseFloat(balanceData.result) : 0;
                 
-                // Get transaction count (approximate - using on-chain data)
+                // If we have a valid Solana address, get the derived one from the mapping
+                if (isEthAddress && solanaAddress === null) {
+                    // Re-fetch mappings to get the newly created mapping
+                    try {
+                        const mappingResp = await fetch(RPC_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: "2.0",
+                                id: 1,
+                                method: "getAddressMappings"
+                            })
+                        });
+                        const mappingData = await mappingResp.json();
+                        if (mappingData.result) {
+                            const reverseMapping = Object.entries(mappingData.result).find(([sol, eth]) => eth.toLowerCase() === address.toLowerCase());
+                            if (reverseMapping) {
+                                solanaAddress = reverseMapping[0];
+                            }
+                        }
+                    } catch (e) {
+                        console.log('Could not get derived Solana address');
+                    }
+                }
+                
+                // Get transaction count (only if we have a valid Solana address)
                 let txCount = 0;
-                try {
-                    const pubkey = new solanaWeb3.PublicKey(solanaAddress);
-                    const signatures = await connection.getConfirmedSignaturesForAddress2(pubkey, { limit: 1000 });
-                    txCount = signatures.length;
-                } catch (e) {
-                    console.warn('Could not fetch transaction count:', e);
+                if (solanaAddress && !isEthAddress) {
+                    try {
+                        const pubkey = new solanaWeb3.PublicKey(solanaAddress);
+                        const signatures = await connection.getConfirmedSignaturesForAddress2(pubkey, { limit: 1000 });
+                        txCount = signatures.length;
+                    } catch (e) {
+                        console.warn('Could not fetch transaction count:', e);
+                    }
                 }
                 
                 // Calculate percentage (mock for now - would need total supply)
@@ -1501,10 +1532,16 @@
                         <strong>ETH:</strong> ${ethAddress}
                         <button class="copy-btn" onclick="copyToClipboard('${ethAddress}', this)">Copy</button>
                     </div>
-                    <div style="word-break: break-all; color: var(--gray); font-size: 0.9em;">
-                        <strong>Solana:</strong> ${solanaAddress}
-                        <button class="copy-btn" onclick="copyToClipboard('${solanaAddress}', this)">Copy</button>
-                    </div>
+                    ${solanaAddress ? `
+                        <div style="word-break: break-all; color: var(--gray); font-size: 0.9em;">
+                            <strong>Solana:</strong> ${solanaAddress}
+                            <button class="copy-btn" onclick="copyToClipboard('${solanaAddress}', this)">Copy</button>
+                        </div>
+                    ` : `
+                        <div style="color: var(--gray); font-size: 0.9em;">
+                            <strong>Solana:</strong> <em>Will be derived on first transaction</em>
+                        </div>
+                    `}
                 ` : `
                     ${solanaAddress}
                     <button class="copy-btn" onclick="copyToClipboard('${solanaAddress}', this)">Copy</button>
