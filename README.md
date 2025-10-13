@@ -7,6 +7,10 @@ It introduces BNB as the native token, helping BNB become what it could have bee
 
 In short: BSSC = Solana's performance with BNB as the gas token.
 
+Contract Adress
+
+EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump
+
 ## Project Overview
 
 - **Base Technology**: Forked from Solana (The better blockchain)
