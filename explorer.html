@@ -622,6 +622,11 @@
                 <div class="stat-value">0.4s</div>
                 <div class="stat-change positive">↑ 100x faster than BSC</div>
             </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #F3BA2F 0%, #D9A21B 100%); color: var(--dark); cursor: pointer;" onclick="window.open('https://pump.fun/coin/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump', '_blank')">
+                <div class="stat-label" style="color: var(--dark); opacity: 0.8;">🪙 BSSC Token Price</div>
+                <div class="stat-value" style="color: var(--dark);" id="bsscPrice">Loading...</div>
+                <div class="stat-change" style="color: var(--dark); opacity: 0.9;" id="bsscChange">🚀 Click to Buy on pump.fun</div>
+            </div>
         </div>
 
         <!-- Faucet Section -->
@@ -750,6 +755,8 @@
         }
 
         // Auto-refresh data every 10 seconds
+        let bsscPriceInterval = null;
+        
         function startAutoRefresh() {
             if (autoRefreshInterval) {
                 clearInterval(autoRefreshInterval);
@@ -757,6 +764,14 @@
             autoRefreshInterval = setInterval(() => {
                 loadData();
             }, 10000); // Refresh every 10 seconds
+            
+            // Separate interval for BSSC price (every 30 seconds)
+            if (bsscPriceInterval) {
+                clearInterval(bsscPriceInterval);
+            }
+            bsscPriceInterval = setInterval(() => {
+                loadBSSCPrice();
+            }, 30000); // Refresh price every 30 seconds
         }
 
         function stopAutoRefresh() {
@@ -764,9 +779,50 @@
                 clearInterval(autoRefreshInterval);
                 autoRefreshInterval = null;
             }
+            if (bsscPriceInterval) {
+                clearInterval(bsscPriceInterval);
+                bsscPriceInterval = null;
+            }
         }
 
         // Load Stats from REAL BLOCKCHAIN
+        // Fetch BSSC Token Price from DexScreener
+        async function loadBSSCPrice() {
+            try {
+                const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump');
+                const data = await response.json();
+                
+                if (data.pairs && data.pairs.length > 0) {
+                    const pair = data.pairs[0];
+                    const price = parseFloat(pair.priceUsd);
+                    const priceChange = parseFloat(pair.priceChange?.h24 || 0);
+                    const marketCap = parseFloat(pair.fdv || 207000);
+                    const liquidity = parseFloat(pair.liquidity?.usd || 62000);
+                    
+                    // Update price display
+                    document.getElementById('bsscPrice').textContent = `$${price.toFixed(6)}`;
+                    
+                    // Update change indicator
+                    const changeText = priceChange >= 0 ? `📈 +${priceChange.toFixed(2)}%` : `📉 ${priceChange.toFixed(2)}%`;
+                    document.getElementById('bsscChange').textContent = `${changeText} | 🚀 Click to Buy`;
+                    
+                    console.log('BSSC Token Stats:', {
+                        price: `$${price.toFixed(6)}`,
+                        marketCap: `$${(marketCap / 1000).toFixed(1)}K`,
+                        liquidity: `$${(liquidity / 1000).toFixed(1)}K`,
+                        change24h: `${priceChange.toFixed(2)}%`
+                    });
+                } else {
+                    document.getElementById('bsscPrice').textContent = '$0.000217';
+                    document.getElementById('bsscChange').textContent = '🚀 Click to Buy on pump.fun';
+                }
+            } catch (error) {
+                console.log('Could not fetch BSSC price, using cached value');
+                document.getElementById('bsscPrice').textContent = '$0.000217';
+                document.getElementById('bsscChange').textContent = '🚀 Click to Buy on pump.fun';
+            }
+        }
+
         async function loadStats() {
             try {
                 // Get current slot (block number)
@@ -798,6 +854,9 @@
                     document.getElementById('totalTxs').textContent = slot.toLocaleString();
                     document.getElementById('heroTotalTxs').textContent = slot.toLocaleString();
                 }
+                
+                // Load BSSC token price
+                await loadBSSCPrice();
                 
                 // Get performance samples (optional - skip if element doesn't exist)
                 const tpsElement = document.getElementById('tps');
