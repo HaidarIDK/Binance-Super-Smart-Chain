@@ -133,8 +133,8 @@ resolver = "2"
 [workspace.package]
 version = "2.0.0"
 authors = ["Binance Super Smart Chain Maintainers <maintainers@binance.com>"]
-repository = "https://github.com/binance-super-smart-chain/bssc"
-homepage = "https://bssc.binance.org/"
+repository = "https://github.com/HaidarIDK/Binance-Super-Smart-Chain"
+homepage = "https://bssc.live"
 license = "Apache-2.0"
 edition = "2021"
 

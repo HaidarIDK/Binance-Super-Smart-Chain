@@ -1,7 +1,9 @@
 {
-  "author": "BSSC Live",
+  "name": "bssc-live-rpc-server",
   "version": "1.0.0",
+  "description": "BSSC Live RPC Server for bssc.live",
   "main": "bssc-live-server.js",
+  "author": "BSSC Live",
   "license": "MIT",
   "keywords": [
     "bssc",
@@ -10,8 +12,6 @@
     "solana",
     "bsc"
   ],
-  "description": "BSSC Live RPC Server for bssc.live",
-  "name": "bssc-live-rpc-server",
   "scripts": {
     "dev": "node bssc-live-server.js",
     "start": "node bssc-live-server.js",
