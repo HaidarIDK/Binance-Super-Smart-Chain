@@ -1,0 +1,49 @@
+{
+  "network": "mainnet",
+  "chainId": 16979,
+  "networkName": "BSSC Mainnet",
+  "nativeToken": {
+    "mint": "EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump",
+    "symbol": "BSSC",
+    "name": "Binance Super Smart Chain",
+    "decimals": 6,
+    "totalSupply": 954000000
+  },
+  "gasFees": {
+    "transfer": 0.001,
+    "contractCall": 0.01,
+    "contractDeploy": 10,
+    "nftMint": 0.1,
+    "staking": 1000
+  },
+  "feeDistribution": {
+    "burn": 50,
+    "validators": 50
+  },
+  "rpc": {
+    "mainnet": "https://rpc.bssc.live",
+    "testnet": "http://localhost:8899",
+    "websocket": "wss://rpc.bssc.live"
+  },
+  "explorer": {
+    "url": "https://explorer.bssc.live",
+    "pumpfun": "https://pump.fun/coin/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump"
+  },
+  "validator": {
+    "minStake": 1000,
+    "rewardRate": 0.05,
+    "slashingRate": 0.1
+  },
+  "limits": {
+    "maxTransactionsPerBlock": 1000,
+    "maxBlockSize": 50000000,
+    "rateLimit": 100
+  },
+  "security": {
+    "requireHttps": true,
+    "enableCors": true,
+    "rateLimit": true,
+    "ddosProtection": true
+  }
+}
+
