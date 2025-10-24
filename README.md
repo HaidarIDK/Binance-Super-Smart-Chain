@@ -7,9 +7,18 @@ It introduces BNB as the native token, helping BNB become what it could have bee
 
 In short: BSSC = Solana's performance with BNB as the gas token.
 
-Contract Address
+## BSSC Native Token
 
-EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump
+**Token Address:** `EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump`
+
+BSSC uses BSSC tokens for gas fees on the blockchain:
+
+- **Buy BSSC:** https://pump.fun/coin/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump
+- **View on DexScreener:** https://dexscreener.com/solana/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump
+- **Gas Fees:** 0.001 BSSC per transfer, 10 BSSC for contract deployment
+- **Fee Distribution:** 50% burned (deflationary), 50% to validators (staking rewards)
+
+Every transaction on BSSC requires BSSC tokens for gas fees, creating constant demand and utility for the token.
 
 ## Project Overview
 

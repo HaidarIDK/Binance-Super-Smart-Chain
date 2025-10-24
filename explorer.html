@@ -629,6 +629,46 @@
             </div>
         </div>
 
+        <!-- Buy BSSC Section -->
+        <div class="table-container" style="margin-bottom: 2rem;">
+            <div class="table-header">
+                <h2 class="table-title">🪙 Buy BSSC Token</h2>
+                <span class="badge success">Live on pump.fun</span>
+            </div>
+            <div style="padding: 2rem;">
+                <p style="color: var(--gray); margin-bottom: 1.5rem;">
+                    BSSC is the native gas token. Every transaction requires <strong>0.001 BSSC</strong> for gas fees. 
+                    Buy BSSC on pump.fun to use the blockchain.
+                </p>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <a href="https://pump.fun/coin/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump" 
+                       target="_blank"
+                       style="display: inline-block; padding: 1rem 2rem; background: var(--primary); color: var(--dark); border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.3s;">
+                        🚀 Buy BSSC on pump.fun
+                    </a>
+                    <a href="https://dexscreener.com/solana/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump" 
+                       target="_blank"
+                       style="display: inline-block; padding: 1rem 2rem; background: var(--card-bg); color: var(--light); border: 2px solid var(--border); border-radius: 8px; font-weight: 600; text-decoration: none; transition: all 0.3s;">
+                        📊 View on DexScreener
+                    </a>
+                </div>
+                <div style="margin-top: 1.5rem; padding: 1rem; background: var(--dark); border-radius: 8px; display: flex; justify-content: space-around; flex-wrap: wrap; gap: 1rem;">
+                    <div style="text-align: center;">
+                        <div style="color: var(--gray); font-size: 0.9rem;">Gas Fee (Transfer)</div>
+                        <div style="color: var(--primary); font-size: 1.5rem; font-weight: bold;">0.001 BSSC</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: var(--gray); font-size: 0.9rem;">Contract Deploy</div>
+                        <div style="color: var(--primary); font-size: 1.5rem; font-weight: bold;">10 BSSC</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="color: var(--gray); font-size: 0.9rem;">NFT Mint</div>
+                        <div style="color: var(--primary); font-size: 1.5rem; font-weight: bold;">0.1 BSSC</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Faucet Section -->
         <div class="table-container" style="margin-bottom: 2rem;">
             <div class="table-header">
@@ -726,6 +766,38 @@
         let autoRefreshInterval = null;
         let isLoading = false;
 
+        // Fetch BSSC Token Price
+        async function fetchBSSCPrice() {
+            try {
+                const response = await fetch(
+                    'https://api.dexscreener.com/latest/dex/tokens/EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump'
+                );
+                const data = await response.json();
+                
+                if (data.pairs && data.pairs.length > 0) {
+                    const pair = data.pairs[0];
+                    const price = parseFloat(pair.priceUsd).toFixed(8);
+                    const change24h = parseFloat(pair.priceChange?.h24 || 0).toFixed(2);
+                    
+                    document.getElementById('bsscPrice').textContent = '$' + price;
+                    
+                    const changeElement = document.getElementById('bsscChange');
+                    if (change24h > 0) {
+                        changeElement.textContent = '↑ +' + change24h + '% (24h)';
+                        changeElement.style.color = 'var(--success)';
+                    } else if (change24h < 0) {
+                        changeElement.textContent = '↓ ' + change24h + '% (24h)';
+                        changeElement.style.color = 'var(--danger)';
+                    } else {
+                        changeElement.textContent = '🚀 Live on pump.fun';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching BSSC price:', error);
+                document.getElementById('bsscPrice').textContent = '$0.000065';
+            }
+        }
+
         // Load Data
         async function loadData() {
             if (isLoading) return;
@@ -739,7 +811,8 @@
                 await Promise.all([
                     loadStats(),
                     loadTransactions(),
-                    loadBlocks()
+                    loadBlocks(),
+                    fetchBSSCPrice()
                 ]);
             } catch (error) {
                 console.error('Error loading data:', error);
