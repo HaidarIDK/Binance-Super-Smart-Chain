@@ -22,6 +22,15 @@ try {
     console.log('   Install with: npm install @solana/web3.js');
 }
 
+// SPL Token support for BSSC token
+let splToken;
+try {
+    splToken = require('@solana/spl-token');
+} catch (e) {
+    console.log('[WARNING] @solana/spl-token not installed - BSSC token features disabled');
+    console.log('   Install with: npm install @solana/spl-token');
+}
+
 // Ethereum transaction decoder  
 let ethereumTx;
 let bsscCommon;
@@ -83,6 +92,30 @@ const OFFICIAL_CONTRACTS = {
         chainId: 16979
     }
 };
+
+// BSSC Native Token Configuration
+const BSSC_TOKEN_CONFIG = {
+    mint: 'EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump',
+    symbol: 'BSSC',
+    name: 'Binance Super Smart Chain',
+    decimals: 6,
+    totalSupply: 954000000,
+    gasFees: {
+        transfer: 0.001,
+        contractCall: 0.01,
+        contractDeploy: 10,
+        nftMint: 0.1,
+        staking: 1000
+    },
+    feeDistribution: {
+        burn: 50,
+        validators: 50
+    }
+};
+
+// Fee collector addresses (to be set after deployment)
+const FEE_COLLECTOR_ADDRESS = process.env.FEE_COLLECTOR_ADDRESS || null;
+const BURN_ADDRESS = process.env.BURN_ADDRESS || '11111111111111111111111111111111';
 
 // BSSC Validator RPC URL - REQUIRED (no mock fallback)
 const BSSC_VALIDATOR_URL = process.env.BSSC_VALIDATOR_URL || 'http://127.0.0.1:8899';
@@ -212,6 +245,84 @@ async function checkValidatorConnection() {
 // Periodically check validator connection
 setInterval(checkValidatorConnection, 30000);
 checkValidatorConnection();
+
+// BSSC Token Helper Functions
+async function checkBSSCBalance(solanaAddress, connection) {
+    if (!splToken || !solanaWeb3) {
+        console.log('[WARNING] BSSC token check skipped - SPL token library not available');
+        return true; // Skip check if library not available
+    }
+    
+    try {
+        const userPubkey = new solanaWeb3.PublicKey(solanaAddress);
+        const mintPubkey = new solanaWeb3.PublicKey(BSSC_TOKEN_CONFIG.mint);
+        
+        // Get or create associated token account
+        const tokenAccount = await splToken.getAssociatedTokenAddress(
+            mintPubkey,
+            userPubkey
+        );
+        
+        // Check balance
+        const balance = await connection.getTokenAccountBalance(tokenAccount);
+        const requiredAmount = BSSC_TOKEN_CONFIG.gasFees.transfer * Math.pow(10, BSSC_TOKEN_CONFIG.decimals);
+        
+        console.log(`[BSSC] Balance check: ${balance.value.uiAmount} BSSC, Required: ${BSSC_TOKEN_CONFIG.gasFees.transfer} BSSC`);
+        
+        return balance.value.amount >= requiredAmount.toString();
+    } catch (error) {
+        console.log('[WARNING] BSSC balance check failed:', error.message);
+        return true; // Allow transaction if check fails (for backwards compatibility)
+    }
+}
+
+async function deductBSSCGasFee(fromAddress, connection, operationType = 'transfer') {
+    if (!splToken || !solanaWeb3 || !FEE_COLLECTOR_ADDRESS) {
+        console.log('[WARNING] BSSC gas fee deduction skipped');
+        return null;
+    }
+    
+    try {
+        const gasFee = BSSC_TOKEN_CONFIG.gasFees[operationType] || BSSC_TOKEN_CONFIG.gasFees.transfer;
+        const feeAmount = gasFee * Math.pow(10, BSSC_TOKEN_CONFIG.decimals);
+        
+        const fromPubkey = new solanaWeb3.PublicKey(fromAddress);
+        const mintPubkey = new solanaWeb3.PublicKey(BSSC_TOKEN_CONFIG.mint);
+        const collectorPubkey = new solanaWeb3.PublicKey(FEE_COLLECTOR_ADDRESS);
+        
+        // Get token accounts
+        const fromTokenAccount = await splToken.getAssociatedTokenAddress(mintPubkey, fromPubkey);
+        const collectorTokenAccount = await splToken.getAssociatedTokenAddress(mintPubkey, collectorPubkey);
+        
+        // Create transfer instruction for gas fee
+        const transferInstruction = splToken.createTransferInstruction(
+            fromTokenAccount,
+            collectorTokenAccount,
+            fromPubkey,
+            feeAmount
+        );
+        
+        console.log(`[BSSC] Gas fee instruction created: ${gasFee} BSSC`);
+        return transferInstruction;
+    } catch (error) {
+        console.log('[WARNING] Failed to create BSSC gas fee instruction:', error.message);
+        return null;
+    }
+}
+
+async function burnBSSC(amount) {
+    if (!splToken || !solanaWeb3) {
+        return;
+    }
+    
+    try {
+        const burnAmount = amount * Math.pow(10, BSSC_TOKEN_CONFIG.decimals);
+        console.log(`[BSSC] Burning ${amount} BSSC tokens`);
+        // Implementation would go here if we had a burn authority
+    } catch (error) {
+        console.log('[WARNING] BSSC burn failed:', error.message);
+    }
+}
 
 // Function to call real BSSC validator (NO FALLBACK - Real only!)
 async function callBSSCValidator(method, params = []) {
@@ -798,6 +909,12 @@ function handleRequest(req, res) {
                     // Create Solana connection
                     const connection = new solanaWeb3.Connection(BSSC_VALIDATOR_URL, 'confirmed');
                     
+                    // Check BSSC token balance before proceeding
+                    const hasEnoughBSSC = await checkBSSCBalance(senderKeypair.publicKey, connection);
+                    if (!hasEnoughBSSC) {
+                        throw new Error(`Insufficient BSSC balance. Need ${BSSC_TOKEN_CONFIG.gasFees.transfer} BSSC for gas fees. Buy BSSC at https://pump.fun/coin/${BSSC_TOKEN_CONFIG.mint}`);
+                    }
+                    
                     // Create Solana keypair object
                     const fromKeypair = solanaWeb3.Keypair.fromSecretKey(senderKeypair.secretKey);
                     const toPublicKey = new solanaWeb3.PublicKey(recipientAddress);
@@ -809,7 +926,17 @@ function handleRequest(req, res) {
                     const transaction = new solanaWeb3.Transaction({
                         recentBlockhash: blockhash,
                         feePayer: fromKeypair.publicKey
-                    }).add(
+                    });
+                    
+                    // Add BSSC gas fee deduction if enabled
+                    const gasFeeInstruction = await deductBSSCGasFee(fromKeypair.publicKey.toString(), connection, 'transfer');
+                    if (gasFeeInstruction) {
+                        transaction.add(gasFeeInstruction);
+                        console.log('[BSSC] Added gas fee instruction to transaction');
+                    }
+                    
+                    // Add the actual transfer
+                    transaction.add(
                         solanaWeb3.SystemProgram.transfer({
                             fromPubkey: fromKeypair.publicKey,
                             toPubkey: toPublicKey,
