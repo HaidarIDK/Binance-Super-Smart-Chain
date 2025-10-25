@@ -9,11 +9,11 @@ In short: BSSC = Solana's performance with BNB as the gas token.
 
 ## Video Tutorial
 
-Watch our tutorial video to get started with BSSC:
+Watch our tutorial to get started with BSSC:
 
-**Note:** Due to file size limitations, please download the tutorial video directly or contact us for access.
+[![BSSC Tutorial](https://img.shields.io/badge/Watch-Tutorial-red)](https://youtu.be/u89f550uACw)
 
-[Download Tutorial Video](tutorial&videoforBSSC.mp4) *(683 MB)*
+[📺 Watch on YouTube](https://youtu.be/u89f550uACw)
 
 ## BSSC Native Token
 
