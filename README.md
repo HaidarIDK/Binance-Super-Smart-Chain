@@ -7,6 +7,14 @@ It introduces BNB as the native token, helping BNB become what it could have bee
 
 In short: BSSC = Solana's performance with BNB as the gas token.
 
+## Video Tutorial
+
+Watch our tutorial video to get started with BSSC:
+
+**Note:** Due to file size limitations, please download the tutorial video directly or contact us for access.
+
+[Download Tutorial Video](tutorial&videoforBSSC.mp4) *(683 MB)*
+
 ## BSSC Native Token
 
 **Token Address:** `EBoXrDiJe363nGrHQoBUN2k2GJzQs11N7kUqUUNVpump`
